@@ -46,7 +46,7 @@ MODULE QuickSort;
             Sort(a, low, j-2);
             Sort(a, j, high);
         END;
-    END;
+    END Sort;
 
 BEGIN
     z := 114359; (* random seed *)
