@@ -823,13 +823,13 @@ void module(void)
             G_close(varsize)
             printf("%d instructions generated\n", G_pc)
     else S_mark("MODULE?")
+    fix_foward_calls()
 end. module
 
 *void P_compile(String source_text)
     S_init(source_text, 0)
     S_get(&sym)
     module()
-    fix_foward_calls()
 end. P_compile
 
 /*
@@ -872,6 +872,7 @@ void init_parser(void)
     enter(StdProc, 8, "DEC", NULL)
     enter(StdProc, 9, "ASSERT", NULL)
     universe = top_scope
+    forward_calls = NULL
 end. init_parser
 
 void test_parser()
@@ -909,7 +910,7 @@ void test_parser()
 
 int main(int argc, char* argv[])
     if argc != 2 do
-        printf("Usage: %s <filename obn file>\n", argv[0])
+        printf("Usage: %s <filename source file>\n", argv[0])
         exit(EXIT_FAILURE)
     char* filename = argv[1]
 
@@ -922,7 +923,7 @@ int main(int argc, char* argv[])
         R_print_code(G_code, G_pc)
         R_load(G_code, G_pc)
         printf("RISC OUTPUT BEGIN\n")
-        R_execute(G_entry * 4)
+        R_execute(G_entry * R_WORD_SIZE)
         printf("RISC OUTPUT END\n")
-        R_print_memory(R_PROG_ORG/4 - 16, R_PROG_ORG/4, 8)
+        R_print_memory(R_PROG_ORG / R_WORD_SIZE - 4 * R_WORD_SIZE, R_PROG_ORG / R_WORD_SIZE, 8)
     return 0
