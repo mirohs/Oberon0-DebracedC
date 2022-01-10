@@ -174,7 +174,7 @@ before.
     // printf("initial PC = %d\n", R[15])
     while true do // interpretation cycle
         nextPC = R[15] + R_WORD_SIZE // address of next instruction word
-        exit_if(R[15] < 0 || R[15] + 3 >= R_MEM_SIZE || (R[15] & 0x3) != 0, 
+        exit_if(R[15] < 0 || R[15] > R_MEM_SIZE - R_WORD_SIZE || (R[15] & 0x3) != 0, 
                 "invalid PC (%d)", R[15])
         IR = M[R[15] / R_WORD_SIZE]; // memory is organized in 32-bit words
         R_decode_instruction(IR, &opc, &a, &b, &c)
