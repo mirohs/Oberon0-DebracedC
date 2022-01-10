@@ -350,7 +350,7 @@ void simple_expression(G_Item* x)
     else
         term(x)
     // s_plus = 6, s_minus = 7, s_or = 8 (see scanner symbols)
-    while (sym >= s_plus) && (sym <= s_or) do
+    while sym >= s_plus && sym <= s_or do
         op = sym
         S_get(&sym)
         if op == s_or do G_op1(op, x)
@@ -364,7 +364,7 @@ void expression(G_Item* x)
     S_Symbol op
     simple_expression(x)
     // s_eql = 9, s_neq = 10, s_lss = 11, s_geq = 12, s_leq = 13, s_gtr = 14 (see scanner symbols)
-    if (sym >= s_eql) && (sym <= s_gtr) do
+    if sym >= s_eql && sym <= s_gtr do
         op = sym
         S_get(&sym)
         simple_expression(&y)
