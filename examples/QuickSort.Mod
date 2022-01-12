@@ -8,7 +8,8 @@ MODULE QuickSort;
     PROCEDURE WriteNumbers;
         VAR i: INTEGER;
     BEGIN
-        i := 0; WHILE i < N DO W(a[i]); INC(i) END
+        i := 0; WHILE i < N DO Write(a[i]); INC(i) END;
+        WriteLn
     END;
 
     PROCEDURE Swap(VAR x, y: INTEGER);
@@ -53,5 +54,5 @@ BEGIN
     i := 0; WHILE i < N DO Random(a[i], 0, 100); INC(i) END;
     WriteNumbers;
     Sort(a, 0, N - 1);
-    WriteLn; WriteNumbers;
+    WriteNumbers;
 END QuickSort.

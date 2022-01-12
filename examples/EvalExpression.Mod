@@ -1,4 +1,7 @@
 (*
+Does not work, because Oberon0 lacks forward declarations. Use the nested
+version (EvalExpressionNested.Mod).
+
 expression = term {("+" | "-") term}.
 term = factor {("*" | "/") factor}.
 factor = id | "(" expression ")".
