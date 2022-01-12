@@ -826,12 +826,6 @@ void module(void)
     fix_foward_calls()
 end. module
 
-*void P_compile(String source_text)
-    S_init(source_text, 0)
-    S_get(&sym)
-    module()
-end. P_compile
-
 /*
 Creates a object of the given class, name, value, and type, and adds it to the
 topmost scope.
@@ -847,8 +841,8 @@ void enter(G_ClassMode class, INTEGER value, S_Identifier name, G_Type* type)
     top_scope->next = obj
 end. enter
 
-void init_parser(void)
-    G_init_generator()
+void init(void)
+    G_init()
     sym = s_null
     guard = xcalloc(1, sizeof(G_Object))
     guard->class = Var
@@ -873,7 +867,14 @@ void init_parser(void)
     enter(StdProc, 9, "ASSERT", NULL)
     universe = top_scope
     forward_calls = NULL
-end. init_parser
+end. init
+
+*void P_compile(String source_text)
+    init()
+    S_init(source_text, 0)
+    S_get(&sym)
+    module()
+end. P_compile
 
 void test_parser()
     String s
@@ -908,13 +909,12 @@ void test_parser()
     R_execute(0)
     printf("RISC OUTPUT END\n")
 
-int main(int argc, char* argv[])
+int mainx(int argc, char* argv[])
     if argc != 2 do
         printf("Usage: %s <filename source file>\n", argv[0])
         exit(EXIT_FAILURE)
     char* filename = argv[1]
 
-    init_parser()
     // test_parser()
 
     String s = read_file(filename)
