@@ -269,7 +269,7 @@ void expression(G_Item* x)
 
 // Parses a selector for array elements or record fields.
 // selector = {"." ident | "[" expression "]"}.
-void selector(G_Item* x)
+void selector(/*inout*/G_Item* x) // x := x[y]  or  x := x.y
     G_Item y = G_make_item()
     G_Object* obj
     while sym == s_lbrak || sym == s_period do
@@ -294,7 +294,7 @@ end. selector
 
 // Parses a factor.
 // factor = ident selector | integer | "(" expression ")" | "~" factor.
-void factor(G_Item* x)
+void factor(/*out*/G_Item* x)
     G_Object* obj
     // synchronization point
     if sym < s_lparen do
@@ -323,7 +323,7 @@ void factor(G_Item* x)
 end. factor
 
 // term = factor {("*" | "DIV" | "MOD" | "&") factor}.
-void term(G_Item* x)
+void term(/*out*/G_Item* x)
     G_Item y = G_make_item()
     S_Symbol op
     factor(x)
@@ -337,7 +337,7 @@ void term(G_Item* x)
 end. term
 
 // SimpleExpression = ["+"|"-"] term {("+"|"-" | "OR") term}.
-void simple_expression(G_Item* x)
+void simple_expression(/*out*/G_Item* x)
     G_Item y = G_make_item()
     S_Symbol op
     if sym == s_plus do 
@@ -359,7 +359,7 @@ void simple_expression(G_Item* x)
 end. simple_expression
 
 // expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpression].
-void expression(G_Item* x)
+void expression(/*out*/G_Item* x)
     G_Item y = G_make_item()
     S_Symbol op
     simple_expression(x)
@@ -390,15 +390,16 @@ void parameter(/*inout*/G_Object** p_formal_parameter)
 end. parameter
 
 // Parses an expression in a single-parameter call (e.g., IO calls).
-void std_proc_call_param(G_Item* x)
+void std_proc_call_param(/*out*/G_Item* x)
     if sym == s_lparen do S_get(&sym); else S_mark("(?")
     expression(x)
     if sym == s_rparen do S_get(&sym); else S_mark(")?")
 end. std_proc_call_param
 
 // Inline procedure calls.
-void std_proc_call(G_Item* x, G_Item* y)
+void std_proc_call(/*in*/G_Item* x, /*out*/G_Item* y)
     require("x is standard procedure", x->mode == StdProc)
+    G_Item delta = G_make_item()
     int std_proc_number = x->a
     switch std_proc_number do
         case 1: // Read
@@ -438,13 +439,12 @@ void std_proc_call(G_Item* x, G_Item* y)
             if y->type->form != Integer do S_mark("not integer")
             if sym == s_comma do
                 S_get(&sym)
-                expression(x) // optional increment
-                if x->type->form != Integer do S_mark("not integer")
+                expression(&delta) // optional increment
             else
-                x->r = -1
-                G_make_const_item(x, G_int_type, 1)
+                G_make_const_item(&delta, G_int_type, 1)
+            if delta.type->form != Integer do S_mark("not integer")
             if sym == s_rparen do S_get(&sym); else S_mark(")?")
-            G_inc_dec(std_proc_number == 7, x, y)
+            G_inc_dec(std_proc_number == 7, y, &delta)
             break
         case 9: // ASSERT
             std_proc_call_param(y)
