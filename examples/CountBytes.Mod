@@ -5,8 +5,8 @@ BEGIN
     ReadByte(c);
     WHILE c # -1 DO
         INC(n);
-        ReadByte(c);
+        ReadByte(c)
     END;
-    Write(n); WriteLn;
+    Write(n); WriteLn
 END CountBytes.
 
