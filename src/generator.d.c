@@ -225,9 +225,9 @@ void load_bool(G_Item* x)
     x->c = 1 // condition: 0: =, 1: !=, 2: <, 3: >=, 4: <=, 5: >
     // needs to be translated into conditional branches
     // Cond mode means:
-    //     r = register (containing boolean value),
-    //     a = false-links, b = true-links,
-    //     c = condition code
+    //   r = register (containing boolean value),
+    //   a = false-links, b = true-links,
+    //   c = condition code
     put(CMPI, 0, x->r, 0) 
     // The comparison result will be in the N and Z flags.
 
@@ -303,7 +303,7 @@ void fix_with(INTEGER L0, INTEGER L1)
 Creates a constant value. It is not directly emmited as code, but stored in the
 item. Most likely, it will later be used in an immediate-mode instruction.
 */
-*void G_make_const_item(G_Item* x, G_Type* type, INTEGER value)
+*void G_make_const_item(/*out*/G_Item* x, G_Type* type, INTEGER value)
     require("register not in use", x->r == -1 || x->r >= FP)
     x->mode = Const
     x->type = type
@@ -324,7 +324,7 @@ Typ (declared type)
 Proc (procedure declaration)
 StdProc (standard procedure)
 */
-*void G_item_from_object(G_Item* x, G_Object* y)
+*void G_item_from_object(/*out*/G_Item* x, /*in*/G_Object* y)
     INTEGER r = -1
     x->mode = y->class
     x->type = y->type
@@ -347,15 +347,17 @@ StdProc (standard procedure)
         x->r = r // register in which the effective address is stored
         x->a = 0 // special case, normally for local variables, a < 0 and for value parameters a > 0
         // printf("G_item_from_object: G_pc=%d ", G_pc); G_print_item(x)
+end. G_item_from_object
 
 // Replaces x by the address of the object referred to by x.y. Called from selector.
-*void G_field(G_Item* x, G_Object* y) // x := x.y
+*void G_field(/*inout*/G_Item* x, /*in*/G_Object* y) // x := x.y
     require("x is a record", x->type->form == Record)
     x->a += y->value
     x->type = y->type
+end. G_field
 
 // Replaces x by the address of the object referred to by x[y]. Called from selector.
-*void G_index(G_Item* x, G_Item* y) // x := x[y]
+*void G_index(/*inout*/G_Item* x, /*in*/G_Item* y) // x := x[y]
     require("x is an array", x->type->form == Array)
     require("valid mode", x->mode == Var || x->mode == Const)
     if y->type != G_int_type do S_mark("index not integer")
@@ -379,6 +381,7 @@ StdProc (standard procedure)
         free_register(&x->r)
         x->r = y->r
     x->type = x->type->base
+end. G_index
 
 /*
 factor = integer | "(" expression ")" | "~" factor.
@@ -388,7 +391,7 @@ expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpre
 */
 
 // Emits unary operators.
-*void G_op1(S_Symbol op, G_Item* x) // x := op x
+*void G_op1(S_Symbol op, /*inout*/G_Item* x) // x := op x
     /// require("valid mode", x->mode == Const || x->mode == Var || x->mode == Reg)
     INTEGER t
     if op == s_minus do // negation
@@ -401,7 +404,7 @@ expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpre
             // need to emit code, because the value to negate is not constant
             if x->mode != Reg do load(x) // was: if x->mode == Var do load(x)
             put(MVN, x->r, 0, x->r)
-    else if op == s_not do //? check boolean expressions
+    else if op == s_not do
         if x->mode != Cond do load_bool(x)
         x->c = negated(x->c)
         // need to swap false-links (a) and true-links (b) of incomplete forward jumps
@@ -419,7 +422,8 @@ expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpre
         put_BR(BEQ + negated(x->c), x->a)
         free_register(&x->r)
         x->a = G_pc - 1 // code index of just emitted branch instruction, for later fixup
-        G_fix_link(x->b) // G_pc is now the index of the next factor of the conditional expression, so can fix true-links that need to go here
+        G_fix_link(x->b) // G_pc is now the index of the next factor of the conditional 
+                         // expression, so can fix true-links that need to go here
         x->b = 0 // end of linked list of true-links
     else if op == s_or do
         // cond_exp = term {OR branch_if_true(next_factor) fixup(false_links) term}.
@@ -432,15 +436,16 @@ expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpre
         put_BR(BEQ + x->c, x->b)
         free_register(&x->r)
         x->b = G_pc - 1 // code index of just emitted branch instruction, for later fixup
-        G_fix_link(x->a) // G_pc is now the index of the next term of the conditional expression, so can fix the false-links that need to go here
+        G_fix_link(x->a) // G_pc is now the index of the next term of the conditional 
+                         // expression, so can fix the false-links that need to go here
         x->a = 0 // end of linked list of false links
 end. G_op1
 
 // Emits binary operators.
-*void G_op2(S_Symbol op, G_Item* x, G_Item* y) // x := x op y
+*void G_op2(S_Symbol op, /*inout*/G_Item* x, /*in*/G_Item* y) // x := x op y
     if x->type->form == Integer && y->type->form == Integer do
         if x->mode == Const && y->mode == Const do
-            // overflow checks missing
+            // todo: overflow checks
             if op == s_plus do x->a += y->a
             else if op == s_minus do x->a -= y->a
             else if op == s_times do x->a = x->a * y->a
@@ -473,7 +478,7 @@ end. G_op2
 Emits code to check the given relation. The relations are: s_eql = 9, s_neq =
 10, s_lss = 11, s_geq = 12, s_leq = 13, s_gtr = 14 (see scanner symbols)
 */
-*void G_relation(S_Symbol op, G_Item* x, G_Item* y) // x := x ? y
+*void G_relation(S_Symbol op, /*inout*/G_Item* x, /*in*/G_Item* y) // x := x ? y
     require("valid relation", s_eql <= op && op <= s_gtr)
     if x->type->form != Integer || y->type->form != Integer do 
         S_mark("bad type")
@@ -482,7 +487,7 @@ Emits code to check the given relation. The relations are: s_eql = 9, s_neq =
         x->c = op - s_eql
     x->mode = Cond
     x->type = G_bool_type
-    x->a = 0 //? can't there be unresolved false-links?
+    x->a = 0
     x->b = 0
 end. G_relation
 
@@ -555,11 +560,11 @@ void store_record(G_Item* x, G_Item* y)
 end. store_record
 
 // Stores the value of expression y in the location denoted by x.
-*void G_store(G_Item* x, G_Item* y) // x := y
+*void G_store(/*inout*/G_Item* x, /*in*/G_Item* y) // x := y
     if assignment_compatible(x->type, y->type) do
         G_Form x_form = x->type->form
         if x_form == Integer || x_form == Boolean do
-            if y->mode == Cond do //? check logic
+            if y->mode == Cond do // transform N,Z flags into a storable value
                 // generate a boolean value (1 for true, 0 for false)
                 put(BEQ + negated(y->c), y->r, 0, y->a)
                 free_register(&y->r)
@@ -576,15 +581,15 @@ end. store_record
                 put(STW, y->r, x->r, x->a - G_pc * 4 * (x->r == PC))
             else
                 S_mark("illegal assignment")
-            free_register(&x->r) //? tentative
+            free_register(&x->r)
             free_register(&y->r)
         else if x_form == Array do
             store_array(x, y)
-            free_register(&x->r) //? tentative
+            free_register(&x->r)
             free_register(&y->r)
         else if x_form == Record do
             store_record(x, y)
-            free_register(&x->r) //? tentative
+            free_register(&x->r)
             free_register(&y->r)
         else S_mark("incompatible assignment")
     else S_mark("incompatible assignment")
@@ -679,7 +684,7 @@ once it is known.
 *void G_io_write_line(void)
     put(WRL, 0, 0, 0)
 
-*void G_inc_dec(bool inc, G_Item* delta, G_Item* y)
+*void G_inc_dec(bool inc, G_Item* y, G_Item* delta)
     if y->mode == Var do
         int pc_relative = 4 * (y->r == PC);
         int r = -1; get_register(&r)
