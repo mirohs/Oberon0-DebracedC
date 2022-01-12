@@ -11,6 +11,9 @@ DEBUG = -g
 # disable default suffixes
 .SUFFIXES:
 
+oberon0: oberon0.o parser.o generator.o scanner.o risc.o util.o
+	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
+
 parser: parser.o generator.o scanner.o risc.o util.o
 	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
 
