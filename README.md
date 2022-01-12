@@ -30,7 +30,7 @@ make
 
 ```sh
 cd ../examples
-../src/parser QuickSort.Mod
+../src/oberon0 QuickSort.Mod
 ```
 
 ## Structure
@@ -139,7 +139,7 @@ END CountBytes.
 Compile and run the program to compute the size of its source text.
 
 ```sh
-../src/parser CountBytes.Mod < CountBytes.Mod
+../src/oberon0 CountBytes.Mod < CountBytes.Mod
 ```
 
 The output (with comments) is:
