@@ -31,11 +31,11 @@ booleval: booleval.o scanner.o util.o
 
 # create C code file with braces {...}
 %.hy.c: %.d.c
-	~/dev/C/embrace/embrace $< > $@
+	../../embrace/embrace $< > $@
 
 # create header and implementation files
 %.c %.h: %.hy.c
-	~/dev/C/headify/headify $<
+	../../headify/headify $<
 
 # pattern rule for compiling .c-file to executable
 #%: %.o util.o
