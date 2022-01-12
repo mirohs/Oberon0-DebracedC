@@ -29,8 +29,8 @@ ActualParameters = "(" [expression {"," expression}] ")" .
 ProcedureCall = ident [ActualParameters].
 
 IfStatement = "IF" expression "THEN" StatementSequence
-{"ELSIF" expression "THEN" StatementSequence}
-["ELSE" StatementSequence] "END".
+              {"ELSIF" expression "THEN" StatementSequence}
+              ["ELSE" StatementSequence] "END".
 
 WhileStatement = "WHILE" expression "DO" StatementSequence "END".
 
