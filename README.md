@@ -35,7 +35,9 @@ cd ../examples
 
 ## Structure
 
-The port of the Oberon-0 compiler is structured as follows: `scanner.d.c` contains the scanner. It performs lexical analysis, i.e., it transforms Oberon-0 source text into a stream of symbols (tokens). Syntax analysis is done by `parser.d.c`. The structure of the recursive descent parser directly mirrors the Oberon-0 EBNF Grammar, given below. The parser calls functions in `generator.d.c` to emit code for the RISC processor. The parser also checks types, ranges of constants, etc. The compiler is a non-optimizing single-pass compiler. A simulator of the RISC processor is located in `risc.d.c`. If source file could successfully be compiled, `parser.d.c` prints the generated instructions and directly executes the code using the simulator. The structure and the source code of the compiler are a direct port of the Oberon-0 compiler given in [1].
+The port of the Oberon-0 compiler is structured as follows: `scanner.d.c` contains the scanner. It performs lexical analysis, i.e., it transforms Oberon-0 source text into a stream of symbols (tokens). Syntax analysis is done by `parser.d.c`. The structure of the recursive descent parser directly mirrors the Oberon-0 EBNF grammar, given below. The parser calls functions in `generator.d.c` to emit code for the RISC processor. The parser also checks types, ranges of constants, etc. The compiler is a non-optimizing single-pass compiler. A simulator of the RISC processor is located in `risc.d.c`. 
+
+The main function is located in `oberon0.d.c`. If source file could successfully be compiled, `oberon0` prints the generated instructions and directly executes the code using the simulator. The structure and the source code of the compiler are a direct port of the Oberon-0 compiler given in [1].
 
 ## Oberon-0 EBNF Grammar
 
