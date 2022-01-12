@@ -783,7 +783,7 @@ Memory layout:
     ensure("all registers free", registers.s == 0)
 
 // Initializes the generator.
-*void G_init_generator(void)
+*void G_init(void)
     G_undefined_type = G_new_type(Undefined, R_WORD_SIZE)
     G_undefined_type->base = G_undefined_type
     G_bool_type = G_new_type(Boolean, R_WORD_SIZE)
