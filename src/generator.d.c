@@ -689,7 +689,7 @@ once it is known.
         int pc_relative = 4 * (y->r == PC);
         int r = -1; get_register(&r)
         put(LDW, r, y->r, y->a - pc_relative * G_pc)
-        if delta->type->form == Const do
+        if delta->mode == Const do
             put(inc ? ADDI : SUBI, r, r, delta->a)
         else
             if delta->mode != Reg do load(delta)
