@@ -1,8 +1,8 @@
 # Oberon0-DebracedC
 
-## Debraced-C port of Oberon-0
+## Oberon-0 Compiler in Debraced-C
 
-This project is a translation of Niklaus Wirth's Oberon-0 compiler as presented in [1] into Debraced-C. Oberon-0 is a simplified variant of Oberon with just the primitive types INTEGER and BOOLEAN and without function procedures. It only compiles a single module. However, Oberon-0 has procedures, value and reference parameters, arrays, and records.
+This project is a translation of Niklaus Wirth's Oberon-0 compiler as presented in [1] into Debraced-C. Oberon-0 is a simplified variant of Oberon with just the basic types INTEGER and BOOLEAN and without function procedures. It only compiles a single module. However, Oberon-0 has procedures, value and reference parameters, arrays, and records.
 
 The source code is compiled for a hypothetical RISC processor as presented in [1]. The RISC processor is reduced to a bare minimum and mainly offers integer arithmetic, comparison, and brach instructions. Some details are given below.
 
