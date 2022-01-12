@@ -68,4 +68,5 @@ clean:
 	rm -f scanner.[ch] scanner
 	rm -f generator.[ch] generator
 	rm -f parser.[ch] parser
+	rm -f oberon0.[ch] oberon0
 	rm -f booleval.[ch] booleval
