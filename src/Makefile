@@ -11,13 +11,13 @@ DEBUG = -g
 # disable default suffixes
 .SUFFIXES:
 
+parser: parser.o generator.o scanner.o risc.o util.o
+	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
+
 risc: risc.o util.o
 	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
 
 scanner: scanner.o util.o
-	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
-
-parser: parser.o generator.o scanner.o risc.o util.o
 	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
 
 to_postfix: to_postfix.o scanner.o util.o
