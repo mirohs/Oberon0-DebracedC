@@ -37,7 +37,7 @@ cd ../examples
 
 The port of the Oberon-0 compiler is structured as follows: `scanner.d.c` contains the scanner. It performs lexical analysis, i.e., it transforms Oberon-0 source text into a stream of symbols (tokens). Syntax analysis is done by `parser.d.c`. The structure of the recursive descent parser directly mirrors the Oberon-0 EBNF grammar, given below. The parser calls functions in `generator.d.c` to emit code for the RISC processor. The parser also checks types, ranges of constants, etc. The compiler is a non-optimizing single-pass compiler. A simulator of the RISC processor is located in `risc.d.c`. 
 
-The main function is located in `oberon0.d.c`. If source file could successfully be compiled, `oberon0` prints the generated instructions and directly executes the code using the simulator. The structure and the source code of the compiler are a direct port of the Oberon-0 compiler given in [1].
+The main function is located in `oberon0.d.c`. If a source file could successfully be compiled, `oberon0` prints the generated instructions and directly executes the code using the simulator. The structure and the source code of the compiler are a direct port of the Oberon-0 compiler given in [1].
 
 ## Oberon-0 EBNF Grammar
 
@@ -88,7 +88,7 @@ module = "MODULE" ident ";" declarations ["BEGIN" StatementSequence] "END" ident
 
 ## RISC Processor
 
-The hypothetical RISC target is a 32-bit processor, i.e., the word size is 4 bytes. All instructions are one word long. There are 16 general-purpose registers (R0 to R15). R15 is used as the program counter (PC) and R14 is used as the link register, containing the return address for the branch-to-subroutine (BSR) instruction. The comparison instructions (CMP, CMPI) implicitly compute the difference of their operands and set the N (negative) and Z (zero) flags according to the result. There are four instruction formats:
+The hypothetical RISC target is a 32-bit processor, i.e., the word size is 4 bytes. All instructions are one word long. There are 16 general-purpose registers (R0 to R15). R15 is used as the program counter (PC) and R14 (link register) is used by the branch-to-subroutine (BSR) instruction to store the return address. The comparison instructions (CMP, CMPI) implicitly compute the difference of their operands and set the N (negative) and Z (zero) flags according to the result. There are four instruction formats:
 
 * F0: 00 op[4] a[4] b[4] unused[14] c[4] 
 * F1: 01 op[4] a[4] b[4] im[18] 
