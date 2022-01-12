@@ -124,7 +124,7 @@ position is output.
     line_and_column(p, &line, &column)
     if p > errpos do
         fprintf(stderr, "\t%d:%d: %s\n", line, column, msg)
-    errpos = p
+    errpos = p + 5
     S_error = true
 
 // Prints the symbol and current state.
