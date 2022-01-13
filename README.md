@@ -180,6 +180,6 @@ The translation of a `.d.c` file is done in multiple steps and is automated by t
 | --- | --- | --- | --- | 
 | executable | o+ | linker (gcc) | + means one or more |
 | o | c and h* | compiler (gcc -c) | * means zero or more |
-| c and h | hy | headify | create header and implementation files |
-| hy | d.c |  embrace | create C code file with braces {...} |
+| c and h | hy.c | headify | create header and implementation files |
+| hy.c | d.c |  embrace | create C code file with braces {...} |
 
