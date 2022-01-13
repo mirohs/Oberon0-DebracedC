@@ -5,8 +5,8 @@ DEBUG = -g
 # exe <-- o*       link
 # o <-- c + h*     compile
 # c <-- h*         preprocessor
-# c + h <-- hy     headify         create header and implementation files
-# hy <-- d.c       embrace         create C code with braces {...}
+# c + h <-- hy.c   headify         create header and implementation files
+# hy.c <-- d.c     embrace         create C code with braces {...}
 
 # disable default suffixes
 .SUFFIXES:
