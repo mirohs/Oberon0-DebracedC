@@ -5,8 +5,8 @@ DEBUG = -g
 # exe <-- o*       link
 # o <-- c + h*     compile
 # c <-- h*         preprocessor
-# c + h <-- hy     headify         create header and implementation files
-# hy <-- d.c       embrace         create C code with braces {...}
+# c + h <-- h.c     headify         create header and implementation files
+# h.c <-- d.c       embrace         create C code with braces {...}
 
 # disable default suffixes
 .SUFFIXES:
@@ -33,11 +33,11 @@ booleval: booleval.o scanner.o util.o
 	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
 
 # create C code file with braces {...}
-%.hy.c: %.d.c
+%.h.c: %.d.c
 	../../embrace/embrace $< > $@
 
 # create header and implementation files
-%.c %.h: %.hy.c
+%.c %.h: %.h.c
 	../../headify/headify $<
 
 # pattern rule for compiling .c-file to executable
