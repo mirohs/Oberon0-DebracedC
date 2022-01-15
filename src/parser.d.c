@@ -869,11 +869,15 @@ void init(void)
     forward_calls = NULL
 end. init
 
-*void P_compile(String source_text)
+*bool P_compile(String source_text, INTEGER** code, int* code_length, int* entry)
     init()
     S_init(source_text, 0)
     S_get(&sym)
     module()
+    *code = G_code
+    *code_length = G_pc
+    *entry = G_entry
+    return !S_error
 end. P_compile
 
 void test_parser()
@@ -902,7 +906,10 @@ void test_parser()
     // s = make_string("MODULE M; VAR x, y: INTEGER; BEGIN x := 2 + 3 END M.")
 
     // s = read_file("if1.obn")
-    P_compile(s)
+    INTEGER* code
+    int code_length
+    int entry
+    bool ok = P_compile(s, &code, &code_length, &entry)
     R_print_code(G_code, G_pc)
     R_load(G_code, G_pc)
     printf("RISC OUTPUT BEGIN\n")
@@ -918,7 +925,10 @@ int mainx(int argc, char* argv[])
     // test_parser()
 
     String s = read_file(filename)
-    P_compile(s)
+    INTEGER* code
+    int code_length
+    int entry
+    bool ok = P_compile(s, &code, &code_length, &entry)
     if !S_error do
         R_print_code(G_code, G_pc)
         R_load(G_code, G_pc)
