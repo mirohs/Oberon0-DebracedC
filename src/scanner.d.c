@@ -175,15 +175,18 @@ end. identifier
 void number(S_Symbol* sym)
     S_value = 0
     *sym = s_number
+    bool too_large = false
     do
         // 10 * val + ORD(ch) - ORD('0') < INT_MAX
         if S_value <= (INT_MAX - ORD(ch) + ORD('0')) / 10 do
             S_value = 10 * S_value + (ORD(ch) - ORD('0'))
         else
-            S_mark("number too large")
-            S_value = 0
+            too_large = true
         read(&ch)
     while (ch >= '0' && ch <= '9')
+    if too_large do
+        S_mark("number too large")
+        S_value = 0
 end. number
 
 // Reads a (possibly nested) comment.
@@ -399,6 +402,7 @@ void scanner_test(void)
     test_source_text("2 * (3 + 4)")
     test_source_text("1234567890")
     // test_source_text("12345678901") // number too large
+    // test_source_text("1234567890123456789012345678901234567890") // number too large
     test_source_text("123(*comment*)456")
     test_source_text("123(*co(*mm*)ent*)456")
 end. scanner_test
