@@ -37,7 +37,7 @@ MODULE M;
         i := 100;
         DEC(i, -i);
         Write(i); WriteLn;
-    END;
+    END f;
 
 BEGIN
     i := 10;

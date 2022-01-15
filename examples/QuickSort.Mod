@@ -3,18 +3,18 @@ MODULE QuickSort;
     TYPE Numbers = ARRAY N OF INTEGER;
     VAR i, z: INTEGER; a: Numbers;
 
-    PROCEDURE W(i: INTEGER); BEGIN Write(i); WriteLn END;
+    PROCEDURE W(i: INTEGER); BEGIN Write(i); WriteLn END W;
 
     PROCEDURE WriteNumbers;
         VAR i: INTEGER;
     BEGIN
         i := 0; WHILE i < N DO Write(a[i]); INC(i) END;
         WriteLn
-    END;
+    END WriteNumbers;
 
     PROCEDURE Swap(VAR x, y: INTEGER);
         VAR h: INTEGER; 
-    BEGIN h := x; x := y; y := h END;
+    BEGIN h := x; x := y; y := h END Swap;
 
     PROCEDURE Random(VAR result: INTEGER; low, high: INTEGER);
         CONST a = 16807; m = 83647; q = m DIV a; r = m MOD a;
@@ -25,7 +25,7 @@ MODULE QuickSort;
         ELSE z := gamma + m
         END;
         result := low + z MOD (high - low)
-    END;
+    END Random;
 
     PROCEDURE Sort(VAR a: Numbers; low, high: INTEGER);
         VAR ipivot, pivot, i, j: INTEGER;

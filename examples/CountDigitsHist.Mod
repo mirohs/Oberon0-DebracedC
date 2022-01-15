@@ -15,7 +15,7 @@ MODULE CountDigitsHist;
             END;
             ReadByte(cc)
         END;
-    END;
+    END Count;
 
     PROCEDURE WriteStars(n: INTEGER);
         CONST MaxStars = 80;
@@ -25,7 +25,7 @@ MODULE CountDigitsHist;
         IF overflow THEN n := MaxStars END;
         i := 0; WHILE i < n DO WriteByte(star); INC(i) END;
         IF overflow THEN WriteByte(tilde) END
-    END;
+    END WriteStars;
 
 BEGIN
     i := 0; WHILE i < len DO digits[i] := 0; INC(i) END;

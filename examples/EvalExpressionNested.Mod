@@ -10,7 +10,7 @@ MODULE EvalExpression;
           space = 20; number = 1; end = 2; lparen = 40; rparen = 41;
     VAR c, sym, value, val0: INTEGER;
 
-    PROCEDURE W(i: INTEGER); BEGIN Write(i); WriteLn END;
+    PROCEDURE W(i: INTEGER); BEGIN Write(i); WriteLn END W;
 
     PROCEDURE GetNumber;
     BEGIN
@@ -19,7 +19,7 @@ MODULE EvalExpression;
             value := 10 * value + (c - zero);
             ReadByte(c);
         END;
-    END;
+    END GetNumber;
 
     PROCEDURE GetSym;
     BEGIN
@@ -33,7 +33,7 @@ MODULE EvalExpression;
         ELSIF c < space THEN sym := end
         ELSE ReadByte(c); GetSym (* unknown input, skip *)
         END;
-    END;
+    END GetSym;
 
     PROCEDURE expression(VAR val0: INTEGER);
         VAR val1, val2: INTEGER; op: INTEGER;
@@ -50,21 +50,21 @@ MODULE EvalExpression;
                 ELSIF sym # end THEN
                     ASSERT(FALSE);
                 END
-            END;
+            END factor;
         BEGIN factor(val1);
             WHILE (sym = times) OR (sym = div) DO
                 op := sym; GetSym; factor(val2);
                 IF op = times THEN val1 := val1 * val2 ELSE val1 := val1 DIV val2 END;
             END;
             val0 := val1
-        END;
+        END term;
     BEGIN term(val1);
         WHILE (sym = plus) OR (sym = minus) DO
             op := sym; GetSym; term(val2);
             IF op = plus THEN INC(val1, val2) ELSE DEC(val1, val2) END
         END;
         val0 := val1
-    END;
+    END expression;
 
 BEGIN
     WHILE TRUE DO

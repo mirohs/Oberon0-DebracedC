@@ -4,7 +4,7 @@ MODULE M;
         VAR y: INTEGER;
     BEGIN
         x := 2 * x;
-    END;
+    END Double;
 BEGIN
     x := 123;
     Double(x);

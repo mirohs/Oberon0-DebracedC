@@ -8,7 +8,7 @@ MODULE M;
     BEGIN 
         x := y;
         y := x;
-        P(x, y);
+        P(x, y); (* endless recursion *)
         P(y, x)
     END P;
 

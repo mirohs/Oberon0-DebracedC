@@ -23,7 +23,7 @@ MODULE BinaryTree;
         ELSE z := gamma + m
         END;
         result := low + z MOD (high - low)
-    END;
+    END Random;
 
     (* Initializes the freelist such that each element points to its
        successor, except the last one, whicht points to NULL. *)
@@ -36,7 +36,7 @@ MODULE BinaryTree;
             INC(i)
         END;
         freelist[M - 1] := 0;
-    END;
+    END InitFreeList;
 
     (* Allocates memory for a new node object. *)
     PROCEDURE new(VAR p: NodePtr);
@@ -45,14 +45,14 @@ MODULE BinaryTree;
         ASSERT(p # NULL);
         freelist[0] := freelist[p]; (* advance to next free node *)
         freelist[p] := -1; (* mark p as in use, not strictly required *)
-    END;
+    END new;
 
     (* Frees the memory of the node object. *)
     PROCEDURE free(p: NodePtr);
     BEGIN
         freelist[p] := freelist[0]; (* p's successor is the old front of the freelist *)
         freelist[0] := p; (* insert p at the front of the freelist *)
-    END;
+    END free;
 
     (* Add x into binary search tree. *)
     PROCEDURE add(VAR tree: NodePtr; x: int);
@@ -69,7 +69,7 @@ MODULE BinaryTree;
         ELSE
             add(deref[tree].right, x)
         END;
-    END;
+    END add;
     (*
     PROCEDURE print(VAR tree: NodePtr);
     BEGIN
@@ -89,7 +89,7 @@ MODULE BinaryTree;
             Write(node.value);
             print(node.right);
         END;
-    END;
+    END print;
 
     (* Free all of the dynamically allocated nodes of the tree. *)
     PROCEDURE FreeTree(VAR tree: NodePtr);
@@ -101,7 +101,7 @@ MODULE BinaryTree;
             FreeTree(node.right);
             free(tree);
         END;
-    END;
+    END FreeTree;
 
     PROCEDURE test;
         VAR t, t1, t2, t3, t4: NodePtr; i, x: int;
@@ -129,7 +129,7 @@ MODULE BinaryTree;
             INC(i);
         END;
         Write(x); WriteLn;
-    END;
+    END test;
 
 BEGIN
     z := 114352; (* random seed *)

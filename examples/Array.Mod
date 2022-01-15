@@ -13,7 +13,7 @@ MODULE M;
         Write(b[0]); WriteLn;
         Write(b[1]); WriteLn;
         Write(b[2]); WriteLn;
-    END;
+    END F;
 BEGIN
     i := 0;
     a[i] := 100 + i;

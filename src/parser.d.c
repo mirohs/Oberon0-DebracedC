@@ -409,7 +409,8 @@ void std_proc_call(/*in*/G_Item* x, /*out*/G_Item* y)
             break
         case 2: // Write
             std_proc_call_param(y)
-            if y->type->form != Integer do S_mark("not integer")
+            if y->type->form != Integer && y->type->form != Boolean do
+                S_mark("neither integer nor boolean")
             G_io_write(y)
             break
         case 3: // WriteHex
@@ -782,6 +783,7 @@ void procedure_decl(void)
         if sym == s_ident do
             if strcmp(procid, S_identifier) != 0 do S_mark("no match")
             S_get(&sym)
+        else S_mark("ident?")
         G_return(parblksize - G_MARK_SIZE) // procedure epilogue
         close_scope()
         G_inc_level(-1)

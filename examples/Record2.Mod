@@ -16,12 +16,12 @@ MODULE M;
         r.b := 34;
         Write(r.a); WriteLn;
         Write(r.b); WriteLn;
-    END;
+    END f;
     PROCEDURE g(VAR r: Rec);
     BEGIN
         r.x := 5;
         r.y := -6;
-    END;
+    END g;
     PROCEDURE h;
         VAR r: Rec;
     BEGIN
@@ -32,7 +32,7 @@ MODULE M;
         g(r);
         Write(r.x); WriteLn;
         Write(r.y); WriteLn;
-    END;
+    END h;
 BEGIN
     i := 100;
     r.x := i;

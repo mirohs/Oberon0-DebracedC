@@ -4,28 +4,29 @@ MODULE M;
     BEGIN
         Write(x);
         WriteLn;
-    END;
+    END W;
     PROCEDURE Double(VAR x: INTEGER);
     BEGIN
         x := 2 * x;
         W(x)
-    END;
+    END Double;
     PROCEDURE Mult(x, y: INTEGER);
     BEGIN
         Read(x);
         Read(y);
         W(x * y)
-    END;
+    END Mult;
     PROCEDURE MultInteractive;
         VAR x, y: INTEGER;
     BEGIN
         Read(x);
         Read(y);
         W(x * y)
-    END;
+    END MultInteractive;
 BEGIN
     x := 123;
     Double(x);
+    ASSERT(x = 246);
     W(x);
     (*Mult(3, 4)*)
     MultInteractive;

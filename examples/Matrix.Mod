@@ -25,7 +25,7 @@ END Matrix.
 
 MODULE Matrix;
 
-    PROCEDURE W(i: INTEGER); BEGIN Write(i); WriteLn END;
+    PROCEDURE W(i: INTEGER); BEGIN Write(i); WriteLn END W;
 
     PROCEDURE P;
         CONST rows = 3; cols = 2;
@@ -59,7 +59,7 @@ MODULE Matrix;
         W(ar[0].y);
         W(ar[1].x);
         W(ar[1].y);
-    END;
+    END P;
 BEGIN
     P
 END Matrix.

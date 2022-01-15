@@ -26,10 +26,10 @@ MODULE M;
     PROCEDURE g(VAR arr: ARR);
         VAR gx: INTEGER;
     BEGIN
-        gx := 0; (*BUG*)
+        gx := 0;
         Write(arr[gx]);
         WriteLn;
-    END;
+    END g;
 
 
 BEGIN

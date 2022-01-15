@@ -22,7 +22,7 @@ VAR digits: ARRAY len OF INTEGER;
             Write(i); Write(digits[i]); WriteLn;
             INC(i)
         END
-    END;
+    END Count;
 BEGIN
     i := 0;
     WHILE i < len DO digits[i] := 0; INC(i) END;
