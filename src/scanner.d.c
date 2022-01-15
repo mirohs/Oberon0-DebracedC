@@ -116,12 +116,12 @@ byte offset from the start of the source text. Only a single message per
 position is output.
 */
 *void S_mark(char* msg)
-    int line, column
-    S_line_and_column(&line, &column)
-    if source_text_pos_token >= errpos do
-        fprintf(stderr, "\t%d:%d: %s\n", line, column, msg)
-    errpos = source_text_pos + 5
     S_error = true
+    if source_text_pos_token >= errpos do
+        int line, column
+        S_line_and_column(&line, &column)
+        fprintf(stderr, "\t%d:%d: %s\n", line, column, msg)
+        errpos = source_text_pos + 5
 
 // Prints the symbol and current state.
 void print_symbol(S_Symbol sym)
