@@ -99,19 +99,16 @@ int source_text_pos_token
 
 #define ORD(ch) ((ch) & 0xff)
 
-void line_and_column(int pos, int* line, int* column)
+*void S_line_and_column(int* line, int* column)
     *line = 1
     *column = 1
-    for int i = 0; i < pos && i < source_text.len; i++ do
+    for int i = 0; i < source_text_pos_token && i < source_text.len; i++ do
         char c = source_text.s[i]
         if c == '\n' do
             *line += 1
-            *column = 0
+            *column = 1
         else
             *column += 1
-
-*void S_line_and_column(int* line, int* column)
-    line_and_column(source_text_pos_token, line, column)
 
 /*
 Outputs a message referring to the current scanner position. The position is the
@@ -121,10 +118,10 @@ position is output.
 *void S_mark(char* msg)
     int p = source_text_pos_token
     int line, column
-    line_and_column(p, &line, &column)
-    if p > errpos do
+    S_line_and_column(&line, &column)
+    if p >= errpos do
         fprintf(stderr, "\t%d:%d: %s\n", line, column, msg)
-    errpos = p + 5
+    errpos = source_text_pos + 5
     S_error = true
 
 // Prints the symbol and current state.
@@ -217,7 +214,7 @@ end. comment
     // S_identifier[0] = '\0'
     // S_value = 0
     while !read_eot() && ch <= ' ' do read(&ch)
-    source_text_pos_token = source_text_pos
+    source_text_pos_token = source_text_pos - 1
     if read_eot() do *sym = s_eof
     else
         switch ch do
