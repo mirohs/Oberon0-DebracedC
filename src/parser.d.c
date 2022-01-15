@@ -377,7 +377,7 @@ compatible with the given formal parameter. Then sets the argument to the next
 parameter (if any).
 ActualParameters = "(" [expression {"," expression}] ")" .
 */
-void parameter(/*inout*/G_Object** p_formal_parameter)
+void parameter(/*out*/G_Object** p_formal_parameter)
     G_Object* formal_parameter = *p_formal_parameter
     G_Item x = G_make_item() // actual parameter
     expression(&x) // actual parameter expression
