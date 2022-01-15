@@ -169,12 +169,14 @@ void free_register(/*inout*/INTEGER* r)
 
 // Emits an instruction.
 void put(int op, int a, int b, int c) 
+    require("valid operation", op < BEQ)
     require("code array not full", G_pc < G_MAX_CODE)
     G_code[G_pc++] = R_encode_instruction(op, a, b, c)
     report_instruction(G_pc - 1)
 
 // Emits a branch instruction.
 void put_BR(int op, int disp) 
+    require("valid operation", op >= BEQ)
     require("code array not full", G_pc < G_MAX_CODE)
     G_code[G_pc++] = R_encode_instruction(op, 0, 0, disp)
     report_instruction(G_pc - 1)
@@ -566,7 +568,7 @@ end. store_record
         if x_form == Integer || x_form == Boolean do
             if y->mode == Cond do // transform N,Z flags into a storable value
                 // generate a boolean value (1 for true, 0 for false)
-                put(BEQ + negated(y->c), y->r, 0, y->a)
+                put_BR(BEQ + negated(y->c), y->a)
                 free_register(&y->r)
                 y->a = G_pc-1 // set location of last foward jump
                 G_fix_link(y->b) // resolve true-links
