@@ -1,10 +1,10 @@
 /*
 @author: Michael Rohs
-@date: December 28, 2021
-Debraced-C translation of: 
-Niklaus Wirth, Compiler Construction, 2005
-Chapter 9. A RISC-Architecture as Target (p. 46ff)
-https://people.inf.ethz.ch/wirth/CompilerConstruction/
+@date: February 9, 2022
+
+Volume 1, Unprivileged Spec v. 20191213
+https://riscv.org/technical/specifications/
+Ch. 24. Instruction Set Listings (p. 130)
 */
 
 #include "util.h"
@@ -13,52 +13,345 @@ https://people.inf.ethz.ch/wirth/CompilerConstruction/
 *#define R_MEM_SIZE 4096 // 1024 // memory size in bytes
 *#define R_PROG_ORG 2048 //  512 // byte offset of program code in memory
 
-// The RISC target is a 32-bit processor.
+// The RISC-V RV32I target is a 32-bit processor.
 *#define R_WORD_SIZE 4
 
 /*
-All instructions of the RISC processor are 32 bits long. There are four formats:
-- F0: 00 op[4] a[4] b[4] unused[14] c[4] 
-- F1: 01 op[4] a[4] b[4] im[18] 
-- F2: 10 op[4] a[4] b[4] disp[18] 
-- F3: 11 op[4] disp[26] 
-where a, b, and c refer to registers (R0-R15) and im and disp are 18-bit
-immediate values. The opcodes occupy the upper 6 bits of the instruction, so
-there can be at most 64 instructions.
+All instructions of the RISC processor are 32 bits long. There are five formats:
+  Bits:     31:25    24:20 19:15 14:12     11:7 6:0
+- R-format: funct7     rs2 rs1 funct3        rd opcode
+- I-format:        imm11:0 rs1 funct3        rd opcode
+- S-format: imm11:5    rs2 rs1 funct3 imm4:0    opcode
+- B-format: imm12,10:5 rs2 rs1 funct3 imm4:1,11 opcode
+- U-format:                  imm31:12        rd opcode
+- J-format:       imm20,10:1,11,19:12        rd opcode
 */
 *typedef enum {
-    // F0: 00 op[4] a[4] b[4] unused[14] c[4] 
-    MOV = 0, MVN = 1, ADD = 2, SUB = 3, MUL = 4, Div = 5, Mod = 6, CMP = 7,
-    // F1: 01 op[4] a[4] b[4] im[18] 
-    MOVI = 16, MVNI = 17, ADDI = 18, SUBI = 19, MULI = 20, DIVI = 21, 
-    MODI = 22, CMPI = 23, CHKI = 24,
-    // F2: 10 op[4] a[4] b[4] disp[18] 
-    LDW = 32, LDB = 33, POP = 34, STW = 36, STB = 37, PSH = 38,
-    RD = 40, WRD = 41, WRH = 42, WRL = 43, RB = 44, WRB = 45, 
-    // F3: 11 op[4] disp[26] 
-    BEQ = 48, BNE = 49, BLT = 50, BGE = 51, BLE = 52, BGT = 53, BR = 56, 
-    BSR = 57, RET = 58
-} R_Opcode
+    // R-format (register):
+    ADD, SUB, XOR, OR, AND, SLL, SRL, SRA, SLT, SLTU, 
+    // I-format (immediate):
+    ADDI, XORI, ORI, ANDI, SLLI, SRLI, SRAI, SLTI, SLTIU, 
+    LB, LH, LW, LBU, LHU, JALR, ECALL, EBREAK, 
+    // S-format (store):
+    SB, SH, SW, 
+    // B-format (branch):
+    BEQ, BNE, BLT, BGE, BLTU, BGEU, 
+    // U-format (upper immediate):
+    LUI, AUIPC, 
+    // J-format (jump):
+    JAL
+} R_Inst
 
-#define NAME(opc) {opc, #opc}
+*typedef enum { FormatR, FormatI, FormatS, FormatB, FormatU, FormatJ } R_InstructionFormat
 
-struct { R_Opcode opc; char* name; } opcode_names[] = {
-    NAME(MOV), NAME(MVN), NAME(ADD), NAME(SUB), NAME(MUL), NAME(Div), NAME(Mod), NAME(CMP),
-    NAME(MOVI), NAME(MVNI), NAME(ADDI), NAME(SUBI), NAME(MULI), NAME(DIVI), 
-    NAME(MODI), NAME(CMPI), NAME(CHKI),
-    NAME(LDW), NAME(LDB), NAME(POP), NAME(STW), NAME(STB), NAME(PSH),
-    NAME(RD), NAME(WRD), NAME(WRH), NAME(WRL), NAME(RB), NAME(WRB),
-    NAME(BEQ), NAME(BNE), NAME(BLT), NAME(BGE), NAME(BLE), NAME(BGT), NAME(BR), 
-    NAME(BSR), NAME(RET)
+*typedef signed int INTEGER
+
+*typedef struct R_Instruction R_Instruction
+*struct R_Instruction
+    R_Inst inst
+    char* name
+    INTEGER format, opcode, funct7, funct3
+    INTEGER rd, rs1, rs2
+    INTEGER imm
+
+R_Instruction instructions[] = {
+    // R-format (register):
+    { ADD, "ADD",       FormatR, 0b0110011, 0, 0, 0, 0, 0, 0 },
+    { SUB, "SUB",       FormatR, 0b0110011, 0x20, 0, 0, 0, 0, 0 },
+    { XOR, "XOR",       FormatR, 0b0110011, 0, 4, 0, 0, 0, 0 },
+    { OR,  "OR",        FormatR, 0b0110011, 0, 6, 0, 0, 0, 0 },
+    { AND, "AND",       FormatR, 0b0110011, 0, 7, 0, 0, 0, 0 },
+    { SLL, "SLL",       FormatR, 0b0110011, 0, 1, 0, 0, 0, 0 },
+    { SRL, "SRL",       FormatR, 0b0110011, 0, 5, 0, 0, 0, 0 },
+    { SRA, "SRA",       FormatR, 0b0110011, 0x20, 5, 0, 0, 0, 0 },
+    { SLT, "SLT",       FormatR, 0b0110011, 0, 2, 0, 0, 0, 0 },
+    { SLTU, "SLTU",     FormatR, 0b0110011, 0, 3, 0, 0, 0, 0 },
+    // I-format (immediate):
+    { ADDI, "ADDI",     FormatI, 0b0010011, 0, 0, 0, 0, 0, 0 },
+    { XORI, "XORI",     FormatI, 0b0010011, 0, 4, 0, 0, 0, 0 },
+    { ORI,  "ORI",      FormatI, 0b0010011, 0, 6, 0, 0, 0, 0 },
+    { ANDI, "ANDI",     FormatI, 0b0010011, 0, 7, 0, 0, 0, 0 },
+    { SLLI, "SLLI",     FormatI, 0b0010011, 0, 1, 0, 0, 0, 0 },
+    { SRLI, "SRLI",     FormatI, 0b0010011, 0, 5, 0, 0, 0, 0 },
+    { SRAI, "SRAI",     FormatI, 0b0010011, 0x20, 5, 0, 0, 0, 0 }, // imm11:5 = 0x20
+    { SLTI, "SLTI",     FormatI, 0b0010011, 0, 2, 0, 0, 0, 0 },
+    { SLTIU, "SLTIU",   FormatI, 0b0010011, 0, 3, 0, 0, 0, 0 },
+    // I-format (load):
+    { LB, "LB",         FormatI, 0b0000011, 0, 0, 0, 0, 0, 0 },
+    { LH, "LH",         FormatI, 0b0000011, 0, 1, 0, 0, 0, 0 },
+    { LW, "LW",         FormatI, 0b0000011, 0, 2, 0, 0, 0, 0 },
+    { LBU, "LBU",       FormatI, 0b0000011, 0, 4, 0, 0, 0, 0 },
+    { LHU, "LHU",       FormatI, 0b0000011, 0, 5, 0, 0, 0, 0 },
+    // I-format (jump and call):
+    { JALR, "JALR",     FormatI, 0b1100111, 0, 0, 0, 0, 0, 0 },
+    { ECALL, "ECALL",   FormatI, 0b1110011, 0, 0, 0, 0, 0, 0 }, // imm = 0
+    { EBREAK, "EBREAK", FormatI, 0b1110011, 0, 0, 0, 0, 0, 1 }, // imm = 1
+    // S-format (store):
+    { SB, "SB",         FormatS, 0b0100011, 0, 0, 0, 0, 0, 0 },
+    { SH, "SH",         FormatS, 0b0100011, 0, 1, 0, 0, 0, 0 },
+    { SW, "SW",         FormatS, 0b0100011, 0, 2, 0, 0, 0, 0 },
+    // B-format (branch):
+    { BEQ, "BEQ",       FormatB, 0b1100011, 0, 0, 0, 0, 0, 0 },
+    { BNE, "BNE",       FormatB, 0b1100011, 0, 1, 0, 0, 0, 0 },
+    { BLT, "BLT",       FormatB, 0b1100011, 0, 4, 0, 0, 0, 0 },
+    { BGE, "BGE",       FormatB, 0b1100011, 0, 5, 0, 0, 0, 0 },
+    { BLTU, "BLTU",     FormatB, 0b1100011, 0, 6, 0, 0, 0, 0 },
+    { BGEU, "BGEU",     FormatB, 0b1100011, 0, 7, 0, 0, 0, 0 },
+    // U-format (upper immediate):
+    { LUI, "LUI",       FormatU, 0b0110111, 0, 0, 0, 0, 0, 0 },
+    { AUIPC, "AUIPC",   FormatU, 0b0010111, 0, 0, 0, 0, 0, 0 },
+    // J-format (jump):
+    { JAL, "JAL",       FormatJ, 0b1101111, 0, 0, 0, 0, 0, 0 },
 }
-#define R_OPCODE_COUNT (sizeof(opcode_names) / sizeof(opcode_names[0]))
+#define R_INSTRUCTION_COUNT (sizeof(instructions) / sizeof(instructions[0]))
 
-*typedef int INTEGER
-*typedef bool BOOLEAN
+enum EcallFunctions { RD, WRD, WRH, WRL, RB, WRB }
+char* ecal_functions_names[] = { "RD", "WRD", "WRH", "WRL", "RB", "WRB" }
+
+int funct7(R_Inst inst)
+    return instructions[inst].funct7
+
+int funct3(R_Inst inst)
+    return instructions[inst].funct3
+
+int opcode(R_Inst inst)
+    return instructions[inst].opcode
+
+int format(R_Inst inst)
+    return instructions[inst].format
+
+// Decodes the given instruction.
+*void R_decode_instruction(INTEGER x, /*out*/R_Instruction* inst)
+    require_not_null(inst)
+    int opcode = x & 0x7f
+    int funct7 = (opcode == 0b0110011) ? (x >> 25) & 0x7f : 0
+    int funct3 = (opcode == 0b0110111 || opcode == 0b0010111|| opcode == 0b1101111) ? 0 : (x >> 12) & 7
+    int rs2 = (x >> 20) & 0x1f
+    int rs1 = (x >> 15) & 0x1f
+    int rd = (x >> 7) & 0x1f
+    int imm = (x >> 20) & 0xfff
+    if imm & 0x800 do imm |= ~0xfff // sign-extend
+    for int i = 0; i < R_INSTRUCTION_COUNT; i++ do
+        R_Instruction* inst2 = instructions + i
+        if inst2->opcode == opcode && inst2->funct7 == funct7 && inst2->funct3 == funct3 do
+            *inst = *inst2
+            switch opcode do
+                case 0b0110011: // R
+                    inst->rd = rd
+                    inst->rs1 = rs1
+                    inst->rs2 = rs2
+                    return
+                case 0b0010011: // I
+                case 0b0000011: // I (load)
+                case 0b1100111: // I (JALR)
+                    inst->rd = rd
+                    inst->rs1 = rs1
+                    if inst2->inst == SRAI do imm &= ~(0x20 << 5)
+                    inst->imm = imm
+                    return
+                case 0b1110011: // I (ECALL, EBREAK)
+                    if imm == 0 do
+                        *inst = instructions[ECALL]
+                        inst->rd = rd
+                        inst->rs1 = rs1
+                        return
+                    else if imm == 1 do
+                        *inst = instructions[EBREAK]
+                        inst->rd = rd
+                        inst->rs1 = rs1
+                        return
+                    else
+                        break
+                    return
+                case 0b0100011: // S
+                    // Bits:       31:25 24:20 19:15  14:12   11:7    6:0
+                    // S-format: imm11:5   rs2   rs1 funct3 imm4:0 opcode
+                    inst->rs1 = rs1
+                    inst->rs2 = rs2
+                    imm = ((x >> 20) & (0x7f << 5)) | ((x >> 7) & 0x1f)
+                    if imm & 0x800 do imm |= ~0xfff // sign-extend
+                    inst->imm = imm
+                    return
+                case 0b1100011: // B
+                    // Bits:          31:25 24:20 19:15  14:12      11:7   6:0
+                    // B-format: imm12,10:5   rs2   rs1 funct3 imm4:1,11 opcode
+                    inst->rs1 = rs1
+                    inst->rs2 = rs2
+                    imm = (((x >> 31) & 1) << 12) | (((x >> 7) & 1) << 11) | (((x >> 25) & 0x3f) << 5) | (((x >> 8) & 0xf) << 1)
+                    if imm & 0x1000 do imm |= ~0x1fff // sign-extend
+                    inst->imm = imm
+                    return
+                case 0b0110111: // U
+                case 0b0010111:
+                    // Bits:   31:25 24:20 19:15 14:12 11:7    6:0
+                    // U-Type:                imm31:12   rd opcode
+                    inst->rd = rd
+                    inst->imm = x >> 12
+                    return
+                case 0b1101111: // J
+                    // Bits:     31:25   24:20 19:15 14:12 11:7    6:0
+                    // J-format: imm20,10:1,11,      19:12   rd opcode
+                    inst->rd = rd
+                    imm = (((x >> 31) & 1) << 20) | (((x >> 12) & 0xff) << 12) | (((x >> 20) & 1) << 11) | (((x >> 21) & 0x3ff) << 1)
+                    if imm & 0x100000 do imm |= ~0x1fffff // sign-extend
+                    inst->imm = imm
+                    return
+    printf("%08x %x %x %x\n", x, opcode, funct7, funct3)
+    assert("not implemented", false)
+
+// Prints the instruction encoded in x.
+*void R_print_instruction(INTEGER x)
+    R_Instruction i
+    R_decode_instruction(x, &i)
+    switch i.format do
+        case FormatR:
+            printf("%s x%d x%d x%d\n", i.name, i.rd, i.rs1, i.rs2)
+            break
+        case FormatI:
+            if i.inst == ECALL || i.inst == EBREAK do
+                printf("%s %s x%d\n", i.name, ecal_functions_names[i.rd], i.rs1)
+            else
+                printf("%s x%d x%d %d\n", i.name, i.rd, i.rs1, i.imm)
+            break
+        case FormatS:
+            printf("%s x%d x%d %d\n", i.name, i.rs2, i.rs1, i.imm)
+            break
+        case FormatB:
+            printf("%s x%d x%d %d\n", i.name, i.rs1, i.rs2, i.imm)
+            break
+        case FormatU:
+            printf("%s x%d %d\n", i.name, i.rd, i.imm)
+            break
+        case FormatJ:
+            printf("%s x%d %d\n", i.name, i.rd, i.imm)
+            break
+        default:
+            printf("%08x\n", x)
+            break
+
+
+/*
+Encodes an instruction according to the given format.
+
+R_encode_R(ADD, rd, rs1, rs2)
+R_encode_I(ADDI, rd, rs1, imm)
+R_encode_I(LB, rd, rs1, imm)
+R_encode_S(SB, rs2, rs1, imm)       M[rs1+imm][0:7] = rs2[0:7]
+R_encode_B(BEQ, rs1, rs2, imm)      if(rs1 == rs2) PC += imm
+R_encode_J(JAL, rd, imm)            rd = PC+4; PC += imm
+R_encode_I(JALR, rd, rs1, imm)      rd = PC+4; PC = rs1 + imm
+R_encode_U(LUI, rd, imm)
+
+Bits:   31:25    24:20 19:15 14:12     11:7 6:0
+R-format: funct7     rs2 rs1 funct3        rd opcode
+I-format: imm11:0        rs1 funct3        rd opcode
+S-format: imm11:5    rs2 rs1 funct3 imm4:0    opcode
+B-format: imm12,10:5 rs2 rs1 funct3 imm4:1,11 opcode
+U-Type: imm31:12                         rd opcode
+J-format: imm20,10:1,11,19:12              rd opcode
+*/
+*INTEGER R_encode_R(int inst, int rd, int rs1, int rs2)
+    require("valid format", format(inst) == FormatR)
+    require("valid range", 0 <= rd && rd <= 31)
+    require("valid range", 0 <= rs1 && rs1 <= 31)
+    require("valid range", 0 <= rs2 && rs2 <= 31)
+    return (funct7(inst) << 25) | (rs2 << 20) | (rs1 << 15) | (funct3(inst) << 12) | (rd << 7) | opcode(inst)
+
+/*
+Encodes an instruction according to the given format.
+
+R_encode_I(ADDI, rd, rs1, imm)
+
+Bits:   31:25    24:20 19:15 14:12     11:7 6:0
+I-format:      imm11:0  rs1 funct3       rd opcode
+*/
+*INTEGER R_encode_I(int inst, int rd, int rs1, int imm)
+    require("valid format", format(inst) == FormatI)
+    require("valid range", 0 <= rd && rd <= 31)
+    require("valid range", 0 <= rs1 && rs1 <= 31)
+    require("valid range", -0x800 <= imm && imm <= 0x7ff)
+    if inst == SRAI do imm |= (0x20 << 5)
+    else if inst == EBREAK do imm = 1
+    return (imm << 20) | (rs1 << 15) | (funct3(inst) << 12) | (rd << 7) | opcode(inst)
+
+/*
+Encodes an instruction according to the given format.
+
+R_encode_S(SB, rs2, rs1, imm)       M[rs1+imm][0:7] = rs2[0:7]
+
+Bits:   31:25    24:20 19:15 14:12     11:7 6:0
+S-format: imm11:5    rs2 rs1 funct3 imm4:0    opcode
+*/
+*INTEGER R_encode_S(int inst, int rs2, int rs1, int imm)
+    require("valid format", format(inst) == FormatS)
+    require("valid range", 0 <= rs1 && rs1 <= 31)
+    require("valid range", 0 <= rs2 && rs2 <= 31)
+    require("valid range", -0x800 <= imm && imm <= 0x7ff)
+    return ((imm >> 5) << 25) | (rs2 << 20) | (rs1 << 15) | (funct3(inst) << 12) | ((imm & 0x1f) << 7) | opcode(inst)
+
+/*
+Encodes an instruction according to the given format.
+
+R_encode_B(BEQ, rs1, rs2, imm)      if(rs1 == rs2) PC += imm
+
+Bits:   31:25    24:20 19:15 14:12     11:7 6:0
+B-format: imm12,10:5 rs2 rs1 funct3 imm4:1,11 opcode
+*/
+*INTEGER R_encode_B(int inst, int rs1, int rs2, int imm)
+    require("valid format", format(inst) == FormatB)
+    require("valid range", BEQ <= inst && inst <= BGEU)
+    require("valid range", 0 <= rs1 && rs1 <= 31)
+    require("valid range", 0 <= rs2 && rs2 <= 31)
+    require("valid range", -0x1000 <= imm && imm <= 0xfff)
+    require("even", (imm & 1) == 0)
+    return ((imm >> 12) << 31) | (((imm >> 5) & 0x3f) << 25) | (rs2 << 20) | (rs1 << 15) | (funct3(inst) << 12) |\
+           (((imm >> 1) & 0xf) << 8) | (((imm >> 11) & 1) << 7) | opcode(inst)
+
+/*
+Encodes an instruction according to the given format.
+
+R_encode_U(LUI, rd, imm)
+
+Bits:   31:25    24:20 19:15 14:12     11:7 6:0
+U-Type:                   imm31:12       rd opcode
+*/
+*INTEGER R_encode_U(int inst, int rd, int imm)
+    require("valid format", format(inst) == FormatU)
+    require("valid range", 0 <= rd && rd <= 31)
+    require("valid range", -0x80000 <= imm && imm <= 0x7ffff)
+    return (imm << 12) | (rd << 7) | opcode(inst)
+
+/*
+Encodes an instruction according to the given format.
+
+R_encode_J(JAL, rd, imm)            rd = PC+4; PC += imm
+
+Bits:   31:25    24:20 19:15 14:12     11:7 6:0
+J-format:       imm20,10:1,11,19:12        rd opcode
+*/
+*INTEGER R_encode_J(int inst, int rd, int imm)
+    require("valid format", format(inst) == FormatJ)
+    require("valid range", 0 <= rd && rd <= 31)
+    require("valid range", -0x100000 <= imm && imm <= 0xfffff)
+    require("even", (imm & 1) == 0)
+    return ((imm >> 20) << 31) | (((imm >> 1) & 0x3ff) << 21) |\
+           (((imm >> 11) & 1) << 20) | (((imm >> 12) & 0xff) << 12) | \
+           (rd << 7) | opcode(inst)
+
+
 
 INTEGER IR // instruction register
-BOOLEAN N, Z // negative and zero flags
-INTEGER R[16] // registers, R[15] is PC, R[14] used as link register by BSR instruction
+/*
+integer registers:
+    x0: zero
+    x1: ra, return address (link register)
+    x2: sp, stack pointer
+    x3: gp, global pointer
+    x4: tp, thread pointer
+    x8: s0/fp, frame pointer
+*/
+INTEGER R[32] // registers
+INTEGER PC // program counter
 INTEGER M[R_MEM_SIZE / R_WORD_SIZE] // program and data memory, organized as 32-bit words
 
 // arithmetic shift (left)
@@ -74,90 +367,43 @@ INTEGER M[R_MEM_SIZE / R_WORD_SIZE] // program and data memory, organized as 32-
     ensure("valid remainder", 0 <= x && x < y)
     return x
 
-// Gets 32-bit word at word address i.
+// Gets 32-bit word at address i.
 INTEGER get_M(INTEGER i)
-    exit_if(i < 0 || i >= R_MEM_SIZE / R_WORD_SIZE, "invalid word address (%d)", i)
-    // printf("get_M(%d) = %d\n", i, M[i])
-    return M[i]
+    exit_if(i < 0 || i + R_WORD_SIZE > R_MEM_SIZE, "invalid address (%d)", i)
+    exit_if((i % R_WORD_SIZE) != 0, "word address not naturally aligned (%d)", i)
+    return M[i / R_WORD_SIZE]
 
-// Gets byte at byte address i.
+// Gets 16-bit halfword at address i.
+INTEGER get_H(INTEGER i)
+    exit_if(i < 0 || i + R_WORD_SIZE / 2 > R_MEM_SIZE, "invalid address (%d)", i)
+    exit_if((i % (R_WORD_SIZE / 2)) != 0, "halfword address not naturally aligned (%d)", i)
+    short* H = (short*)M; // halfword access to memory
+    return M[i / (R_WORD_SIZE / 2)] & 0xffff
+
+// Gets 8-bit byte at address i.
 INTEGER get_B(INTEGER i)
-    exit_if(i < 0 || i >= R_MEM_SIZE, "invalid byte address (%d)", i)
+    exit_if(i < 0 || i >= R_MEM_SIZE, "invalid address (%d)", i)
     char* B = (char*)M; // byte access to memory
     return B[i] & 0xff
 
-// Sets 32-bit word at word address i to x.
+// Sets 32-bit word at address i to x.
 void set_M(INTEGER i, INTEGER x)
-    exit_if(i < 0 || i >= R_MEM_SIZE / R_WORD_SIZE, "invalid word address (%d)", i)
-    // printf("set_M(%d, %d)\n", i, x)
-    M[i] = x
+    exit_if(i < 0 || i + R_WORD_SIZE > R_MEM_SIZE, "invalid address (%d)", i)
+    exit_if((i % R_WORD_SIZE) != 0, "word address not naturally aligned (%d)", i)
+    M[i / R_WORD_SIZE] = x
 
-// Sets byte at byte address i to x.
+// Sets halfword at address i to x.
+void set_H(INTEGER i, INTEGER x)
+    exit_if(i < 0 || i + R_WORD_SIZE / 2 > R_MEM_SIZE, "invalid address (%d)", i)
+    exit_if((i % (R_WORD_SIZE / 2)) != 0, "halfword address not naturally aligned (%d)", i)
+    short* H = (short*)M; // halfword access to memory
+    H[i / (R_WORD_SIZE / 2)] = x
+
+// Sets byte at address i to x.
 void set_B(INTEGER i, INTEGER x)
-    exit_if(i < 0 || i >= R_MEM_SIZE, "invalid byte address (%d)", i)
+    exit_if(i < 0 || i >= R_MEM_SIZE, "invalid address (%d)", i)
     char* B = (char*)M; // byte access to memory
     B[i] = x
-
-// Decodes the given instruction.
-*void R_decode_instruction(INTEGER x, INTEGER* opc, INTEGER* a, INTEGER* b, INTEGER* c)
-    *opc = (x >> 26) & 0x3f // 6 bits
-    *a = (x >> 22) & 0xf // 4 bits
-    *b = (x >> 18) & 0xf // 4 bits
-    if *opc < MOVI do 
-        *c = x & 0xf // instruction format F0
-    else if *opc < BEQ do
-        *c = x & 0x3ffff // instruction format F1 or F2, 18 bits im or disp
-        if *c >= 0x20000 do *c -= 0x40000 // sign extension
-    else 
-        *c = x & 0x3ffffff // instruction format F3, 26 bits disp
-        if *c >= 0x2000000 do *c -= 0x4000000 // sign extension
-
-// Prints the instruction encoded in x.
-*void R_print_instruction(INTEGER x)
-    INTEGER opc, a, b, c
-    R_decode_instruction(x, &opc, &a, &b, &c)
-    char* opc_name = "?"
-    for int i = 0; i < R_OPCODE_COUNT; i++ do
-        if opcode_names[i].opc == opc do 
-            opc_name = opcode_names[i].name
-            break
-    if opc < MOVI do 
-        printf("%-4s %2d %2d %2d\n", opc_name, a, b, c)
-    else if opc < BEQ do
-        printf("%-4s %2d %2d %2d\n", opc_name, a, b, c)
-    else 
-        printf("%-4s %2d\n", opc_name, c)
-
-/*
-Encodes an instruction according to the given format. Negative values for c have
-to be limited to 4 bits (F0), 18 bits (F1 and F2), or 26 (F3) bits.
-*/
-*INTEGER R_encode_instruction(int opc, int a, int b, int c)
-    exit_if(opc < 0 || opc > RET, "opc out of range (%d)", opc)
-    exit_if(a < 0 || a > 0xf, "a out of range (%d)", a)
-    exit_if(b < 0 || b > 0xf, "b out of range (%d)", b)
-    opc &= 0x3f
-    a &= 0xf
-    b &= 0xf
-    if opc < MOVI do 
-        // instruction format F0
-        exit_if(c < 0 || c > 0xf, "c out of range (%d), F0", c)
-        c &= 0xf
-    else if opc < BEQ do
-        // instruction format F1 or F2, 18 bits im or disp
-        exit_if(c < -0x20000 || c > 0x1ffff, "c out of range (%d), F1 or F2", c)
-        c &= 0x3ffff 
-    else
-        // instruction format F3, 26 bits disp
-        exit_if(a != 0, "a != 0 (%d), F3", a)
-        exit_if(b != 0, "b != 0 (%d), F3", b)
-        exit_if(c < -0x2000000 || c >= 0x2000000, "c out of range (%d), F3", c)
-        a = 0
-        b = 0
-        c &= 0x3ffffff 
-    INTEGER i = (opc << 26) | (a << 22) | (b << 18) | c
-    // R_print_instruction(i)
-    return i
 
 /*
 Executes code starting at the given start address. The start address is given in
@@ -168,53 +414,81 @@ before.
     require("valid start", start >= 0 
                            && R_PROG_ORG + start + R_WORD_SIZE <= R_MEM_SIZE 
                            && (start & 0x3) == 0)
-    INTEGER opc, a, b, c, nextPC
-    R[14] = 0 // link register
-    R[15] = start + R_PROG_ORG // program counter
+    INTEGER nextPC
+    R_Instruction i
+    R[0] = 0 // zero
+    R[1] = 0 // link register
+    R[2] = R_MEM_SIZE // stack pointer
+    PC = start + R_PROG_ORG // program counter
     // printf("initial PC = %d\n", R[15])
     while true do // interpretation cycle
-        nextPC = R[15] + R_WORD_SIZE // address of next instruction word
-        exit_if(R[15] < 0 || R[15] > R_MEM_SIZE - R_WORD_SIZE || (R[15] & 0x3) != 0, 
-                "invalid PC (%d)", R[15])
-        IR = M[R[15] / R_WORD_SIZE]; // memory is organized in 32-bit words
-        R_decode_instruction(IR, &opc, &a, &b, &c)
-        if opc < MOVI do c = R[c & 0xf]
-        switch opc do
-            case MOV: case MOVI: R[a] = ASH(c, b); break // arithmetic shift
-            case MVN: case MVNI: R[a] = -ASH(c, b); break
-            case ADD: case ADDI: R[a] = R[b] + c; break
-            case SUB: case SUBI: R[a] = R[b] - c; break
-            case MUL: case MULI: R[a] = R[b] * c; break
-            case Div: case DIVI: R[a] = R[b] / c; break
-            case Mod: case MODI: R[a] = R_mod(R[b], c); break
-            case CMP: case CMPI: Z = R[b] == c; N = R[b] < c; break
-            case CHKI: exit_if(R[a] < 0 || R[a] >= c, \
-                            "CHKI failed (%d, %d)", c, R[a]); break
-            case LDW: R[a] = get_M((R[b] + c) / R_WORD_SIZE); break
-            case LDB: R[a] = get_B(R[b] + c); break
-            case POP: R[a] = get_M((R[b]) / R_WORD_SIZE); R[b] += c; break
-            case STW: set_M((R[b] + c) / R_WORD_SIZE, R[a]); break
-            case STB: set_B(R[b] + c, R[a]); break
-            case PSH: R[b] -= c; set_M(R[b] / R_WORD_SIZE, R[a]); break
-            case RD: scanf("%d", &R[a]); break
-            case WRD: printf(" %d", R[c]); break
-            case WRH: printf(" %xH", R[c]); break
-            case WRL: printf("\n"); break
-            case RB: R[a] = getchar(); break
-            case WRB: putchar(R[c]); break
-            case BEQ: if Z do nextPC = R[15] + c * R_WORD_SIZE; break
-            case BNE: if !Z do nextPC = R[15] + c * R_WORD_SIZE; break
-            case BLT: if N do nextPC = R[15] + c * R_WORD_SIZE; break
-            case BGE: if !N do nextPC = R[15] + c * R_WORD_SIZE; break
-            case BLE: if Z || N do nextPC = R[15] + c * R_WORD_SIZE; break
-            case BGT: if !Z && !N do nextPC = R[15] + c * R_WORD_SIZE; break
-            case BR:  nextPC = R[15] + c * R_WORD_SIZE; break
-            case BSR: nextPC = R[15] + c * R_WORD_SIZE; R[14] = R[15] + R_WORD_SIZE; break
-            case RET: nextPC = R[c & 0xf]; break
-            default: exit_if(true, "invalid opcode (%d)", opc)
+        nextPC = PC + R_WORD_SIZE // address of next instruction word
+        exit_if(PC < 0 || PC > R_MEM_SIZE - R_WORD_SIZE || (PC & 0x3) != 0, 
+                "invalid PC (%d)", PC)
+        IR = M[PC / R_WORD_SIZE]; // memory is organized in 32-bit words
+        R_decode_instruction(IR, &i)
+        switch i.inst do
+            // R-format (register):
+            case ADD: R[i.rd] = R[i.rs1] + R[i.rs2]; break
+            case SUB: R[i.rd] = R[i.rs1] - R[i.rs2]; break
+            case XOR: R[i.rd] = R[i.rs1] ^ R[i.rs2]; break
+            case OR: R[i.rd] = R[i.rs1] | R[i.rs2]; break
+            case AND: R[i.rd] = R[i.rs1] & R[i.rs2]; break
+            case SLL: R[i.rd] = R[i.rs1] << R[i.rs2]; break
+            case SRL: R[i.rd] = (unsigned)R[i.rs1] >> R[i.rs2]; break
+            case SRA: R[i.rd] = R[i.rs1] >> R[i.rs2]; break
+            case SLT: R[i.rd] = R[i.rs1] < R[i.rs2] ? 1 : 0; break
+            case SLTU: R[i.rd] = (unsigned)R[i.rs1] < (unsigned)R[i.rs2] ? 1 : 0; break
+            // I-format (immediate):
+            case ADDI: R[i.rd] = R[i.rs1] + i.imm; break
+            case XORI: R[i.rd] = R[i.rs1] ^ i.imm; break
+            case ORI: R[i.rd] = R[i.rs1] | i.imm; break
+            case ANDI: R[i.rd] = R[i.rs1] & i.imm; break
+            case SLLI: R[i.rd] = R[i.rs1] << i.imm; break
+            case SRLI: R[i.rd] = (unsigned)R[i.rs1] >> i.imm; break
+            case SRAI: R[i.rd] = R[i.rs1] >> i.imm; break
+            case SLTI: R[i.rd] = R[i.rs1] < i.imm ? 1 : 0; break
+            case SLTIU: R[i.rd] = (unsigned)R[i.rs1] < (unsigned)i.imm ? 1 : 0; break
+            // I-format (load):
+            case LB: R[i.rd] = get_M(R[i.rs1] + i.imm) & 0xff;\
+                     if R[i.rd] & 0x80 do R[i.rd] |= ~0xff; break
+            case LH: R[i.rd] = get_M(R[i.rs1] + i.imm) & 0xffff;\
+                     if R[i.rd] & 0x8000 do R[i.rd] |= ~0xffff; break
+            case LW: R[i.rd] = get_M(R[i.rs1] + i.imm); break
+            // I-format (jump and call):
+            case JALR: R[i.rd] = PC + R_WORD_SIZE; nextPC = (R[i.rs1] + i.imm) & ~1; break
+            case ECALL: // R_encode_I(ECALL, WRL, rs1, 0)
+                //R_print_instruction(IR)
+                switch i.rd do
+                    case RD: scanf("%d", &R[i.rs1]); break
+                    case WRD: printf(" %d", R[i.rs1]); break
+                    case WRH: printf(" %xH", R[i.rs1]); break
+                    case WRL: printf("\n"); break
+                    case RB: R[i.rs1] = getchar(); break
+                    case WRB: putchar(R[i.rs1]); break
+                    default: /*ignore*/ break
+                break
+            // S-format (store): R_encode_S(SB, rs2, rs1, imm)       M[rs1+imm][0:7] = rs2[0:7]
+            case SB: set_B(R[i.rs1] + i.imm, R[i.rs2]); break
+            case SH: set_H(R[i.rs1] + i.imm, R[i.rs2]); break
+            case SW: set_M(R[i.rs1] + i.imm, R[i.rs2]); break
+            // B-format (branch):
+            case BEQ: if R[i.rs1] == R[i.rs2] do nextPC = PC + i.imm; break
+            case BNE: if R[i.rs1] != R[i.rs2] do nextPC = PC + i.imm; break
+            case BLT: if R[i.rs1] < R[i.rs2] do nextPC = PC + i.imm; break
+            case BGE: if R[i.rs1] >= R[i.rs2] do nextPC = PC + i.imm; break
+            case BLTU: if (unsigned)R[i.rs1] < (unsigned)R[i.rs2] do nextPC = PC + i.imm; break
+            case BGEU: if (unsigned)R[i.rs1] >= (unsigned)R[i.rs2] do nextPC = PC + i.imm; break
+            // U-format (upper immediate):
+            case LUI: R[i.rd] = i.imm << 12; break
+            case AUIPC: R[i.rd] = PC + (i.imm << 12); break
+            // J-format (jump):
+            case JAL: R[i.rd] = PC + R_WORD_SIZE; nextPC = (PC + i.imm) & ~1; break
+            default: exit_if(true, "invalid instruction (%d, %s)", i.inst, i.name)
         end. switch
+        R[0] = 0
         if nextPC == 0 do break // exit interpretation cycle
-        R[15] = nextPC
+        PC = nextPC
     end. while
 end. execute
 
@@ -255,122 +529,341 @@ given length.
         printf("\n")
 
 // Enters instruction into code array.
-#define I(opc, a, b, c) code[len++] = R_encode_instruction(opc, a, b, c)
+//#define I(opc, a, b, c) code[len++] = R_encode_instruction(opc, a, b, c)
+
+#define test_equal_instruction(a, e) base_test_equal_instruction(__FILE__, __LINE__, a, e)
+
+bool base_test_equal_instruction(const char *file, int line, R_Instruction actual, R_Instruction expected)
+    int ok = true
+    if actual.inst != expected.inst do
+        printf("inst not equal; ")
+        ok = false
+    if actual.format != expected.format do
+        printf("format not equal; ")
+        ok = false
+    if actual.opcode != expected.opcode do
+        printf("opcode not equal; ")
+        ok = false
+    if actual.funct7 != expected.funct7 do
+        printf("funct7 not equal; ")
+        ok = false
+    if actual.funct3 != expected.funct3 do
+        printf("funct3 not equal; ")
+        ok = false
+    if actual.rd != expected.rd do
+        printf("rd not equal; ")
+        ok = false
+    if actual.rs1 != expected.rs1 do
+        printf("rs1 not equal; ")
+        ok = false
+    if actual.rs2 != expected.rs2 do
+        printf("rs2 not equal; ")
+        ok = false
+    if actual.rd != expected.rd do
+        printf("rd not equal; ")
+        ok = false
+    if actual.imm != expected.imm do
+        printf("imm not equal; ")
+        ok = false
+    base_test_equal_i(file, line, ok, 1)
+    return ok
 
 // Performs some tests.
 void test_risc(void)
     require("valid word length", sizeof(INTEGER) == R_WORD_SIZE)
 
-    int i
-    INTEGER opc, a, b, c
-    INTEGER opc2, a2, b2, c2
+    INTEGER a
+    R_Instruction x, y
 
-    i = R_encode_instruction(opc = MOVI, a = 1, b = 2, c = 0x1ffff)
-    R_print_instruction(i)
-    R_decode_instruction(i, &opc2, &a2, &b2, &c2)
-    test_equal_i(opc, opc2)
-    test_equal_i(a, a2)
-    test_equal_i(b, b2)
-    test_equal_i(c, c2)
+    // R-format (register):
 
-    i = R_encode_instruction(opc = MOVI, a = 3, b = 4, c = -0x20000)
-    R_print_instruction(i)
-    R_decode_instruction(i, &opc2, &a2, &b2, &c2)
-    test_equal_i(opc, opc2)
-    test_equal_i(a, a2)
-    test_equal_i(b, b2)
-    test_equal_i(c, c2)
+    a = R_encode_R(ADD, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+    R_decode_instruction(a, &x)
+    y = instructions[ADD]; y.rd = 1; y.rs1 = 2; y.rs2 = 3
+    test_equal_instruction(x, y)
 
-    i = R_encode_instruction(opc = ADDI, a = 5, b = 6, c = -1)
-    R_print_instruction(i)
-    R_decode_instruction(i, &opc2, &a2, &b2, &c2)
-    test_equal_i(opc, opc2)
-    test_equal_i(a, a2)
-    test_equal_i(b, b2)
-    test_equal_i(c, c2)
+    a = R_encode_R(SUB, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+    R_decode_instruction(a, &x)
+    y = instructions[SUB]; y.rd = 1; y.rs1 = 2; y.rs2 = 3
+    test_equal_instruction(x, y)
 
-    i = R_encode_instruction(opc = SUBI, a = 5, b = 6, c = 123)
-    R_print_instruction(i)
-    R_decode_instruction(i, &opc2, &a2, &b2, &c2)
-    test_equal_i(opc, opc2)
-    test_equal_i(a, a2)
-    test_equal_i(b, b2)
-    test_equal_i(c, c2)
+    a = R_encode_R(XOR, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
 
-    //R_encode_instruction(MOVI, 0, 0, 0x20000) // out of range
-    //R_encode_instruction(MOVI, 0, 0, -0x20000-1) // out of range
+    a = R_encode_R(OR, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_R(AND, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_R(SLL, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_R(SRL, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_R(SRA, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_R(SLT, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_R(SLTU, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    // I-format (immediate):
+
+    a = R_encode_I(ADDI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    printf("%d\n", 0x7ff)
+    a = R_encode_I(ADDI, 1, 2, 0x7ff)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(ADDI, 1, 2, -1)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(ADDI, 1, 2, -2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(ADDI, 1, 2, -2048)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(XORI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(ORI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(ANDI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(SLLI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(SRLI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(SRAI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(SLTI, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(SLTIU, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    // I-format (load):
+
+    a = R_encode_I(LB, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(LH, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(LW, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(LBU, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(LHU, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    // I-format (jump and call):
+
+    a = R_encode_I(JALR, 1, 2, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(ECALL, 0, 0, 0)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_I(EBREAK, 0, 0, 0)
+    printf("%08x ", a); R_print_instruction(a)
+
+    // S-format (store):
+
+    a = R_encode_S(SB, 2, 1, 3) // R_encode_S(SB, rs2, rs1, imm)   M[rs1+imm][0:7] = rs2[0:7]
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_S(SH, 2, 1, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_S(SW, 2, 1, 3)
+    printf("%08x ", a); R_print_instruction(a)
+
+    printf("%d ", 0x7ff)
+    a = R_encode_S(SH, 2, 1, 0x7ff)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_S(SH, 2, 1, -1)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_S(SH, 2, 1, -2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_S(SH, 2, 1, -2048)
+    printf("%08x ", a); R_print_instruction(a)
+
+
+    // B-format (branch):
+
+    for int i = -10; i <= 10; i += 2 do
+        a = R_encode_B(BEQ, 1, 2, i) // R_encode_B(BEQ, rs1, rs2, imm)    if(rs1 == rs2) PC += imm
+        printf("%3d %08x ", i, a);     R_print_instruction(a)
+
+    printf("%d ", 0xffe)
+    a = R_encode_B(BEQ, 1, 2, 0xffe)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_B(BEQ, 1, 2, -0xffe - 2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_B(BNE, 1, 2, 10)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_B(BLT, 1, 2, 20)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_B(BGE, 1, 2, 30)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_B(BLTU, 1, 2, 40)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_B(BGEU, 1, 2, 50)
+    printf("%08x ", a); R_print_instruction(a)
+
+    // U-format (upper immediate):
+
+    a = R_encode_U(LUI, 1, 2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_U(AUIPC, 1, 2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    // J-format (jump):
+
+    a = R_encode_J(JAL, 1, 2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    printf("%d ", 0x0ffffe)
+    a = R_encode_J(JAL, 1, 0x0ffffe)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_J(JAL, 1, -2)
+    printf("%08x ", a); R_print_instruction(a)
+
+    a = R_encode_J(JAL, 1, -0x0ffffe - 2)
+    printf("%08x ", a); R_print_instruction(a)
 
     INTEGER code[100]
     int len = 0
+    #define IR(inst, rd, rs1, rs2) code[len++] = R_encode_R(inst, rd, rs1, rs2)
+    #define II(inst, rd, rs1, imm) code[len++] = R_encode_I(inst, rd, rs1, imm)
+    #define IB(inst, rs1, rs2, imm) code[len++] = R_encode_B(inst, rs1, rs2, imm)
+    #define IU(inst, rd, imm) code[len++] = R_encode_U(inst, rd, imm)
+    // R_encode_S(SB, rs2, rs1, imm)       M[rs1+imm][0:7] = rs2[0:7]
+    #define IS(inst, rs2, rs1, imm) code[len++] = R_encode_S(inst, rs2, rs1, imm)
 
     // 123 + 456
-    I(MOVI, 0, 0, 123)
-    I(WRD, 0, 0, 0)
-    I(MOVI, 1, 0, 456)
-    I(WRD, 0, 0, 1)
-    I(ADD, 2, 0, 1)
-    I(WRD, 0, 0, 2)
-    I(WRL, 0, 0, 0)
+    II(ADDI, 5, 0, 123)
+    II(ADDI, 6, 0, 456)
+    II(ADDI, 7, 5, 6)
+    IR(ADD, 8, 5, 6)
+    II(ECALL, WRD, 5, 0)
+    II(ECALL, WRD, 6, 0)
+    II(ECALL, WRD, 7, 0)
+    II(ECALL, WRD, 8, 0)
+    II(ECALL, WRL, 0, 0)
+
+    // 123 - 456
+    II(ADDI, 5, 0, 123)
+    II(ADDI, 6, 0, 456)
+    II(ADDI, 7, 5, -456)
+    IR(SUB, 8, 5, 6)
+    II(ECALL, WRD, 5, 0)
+    II(ECALL, WRD, 6, 0)
+    II(ECALL, WRD, 7, 0)
+    II(ECALL, WRD, 8, 0)
+    II(ECALL, WRL, 0, 0)
 
     // 1 2 ... 10
-    I(MOVI, 0, 0, 0)
-    I(WRD, 0, 0, 0)
-    I(ADDI, 0, 0, 1)
-    I(CMPI, 0, 0, 10)
-    I(BLE, 0, 0, -3)
-    I(WRL, 0, 0, 0)
+    II(ADDI, 5, 0, 1)
+    II(ADDI, 6, 0, 10)
+    II(ECALL, WRD, 5, 0)
+    II(ADDI, 5, 5, 1)
+    IB(BGE, 6, 5, -2 * 4)
+    II(ECALL, WRL, 0, 0)
 
     // 1024 512 256 ... 1
-    I(MOVI, 0, 0, 1024)
-    I(WRD, 0, 0, 0)
-    I(DIVI, 0, 0, 2)
-    I(CMPI, 0, 0, 0)
-    I(BGT, 0, 0, -3)
-    I(WRL, 0, 0, 0)
+    II(ADDI, 5, 0, 1024)
+    II(ADDI, 6, 0, 0)
+    II(ECALL, WRD, 5, 0)
+    II(SRLI, 5, 5, 1)
+    IB(BLT, 0, 5, -2 * 4)
+    II(ECALL, WRL, 0, 0)
 
-    // x := input, x * 10, x / 10, x mod 10
-    //I(RD, 0, 0, 0)
-    I(MULI, 1, 0, 10)
-    I(WRD, 0, 0, 1)
-    I(DIVI, 1, 0, 10)
-    I(WRD, 0, 0, 1)
-    I(MODI, 1, 0, 10)
-    I(WRD, 0, 0, 1)
-    I(WRL, 0, 0, 0)
+    // immediate has a range of 12 bits, signed
+    II(ADDI, 5, 0, 0x7ff)
+    II(ECALL, WRD, 5, 0)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
 
-    // sign extension
-    I(MOVI, 0, 0, 0x1ffff) // largest number (positive)
-    I(WRD, 0, 0, 0)
-    I(WRL, 0, 0, 0)
-    I(MOVI, 0, 0, -0x20000) // smallest number (negative)
-    I(WRD, 0, 0, 0)
-    I(WRL, 0, 0, 0)
-    I(MOVI, 0, 0, -1)
-    I(WRD, 0, 0, 0)
-    I(WRL, 0, 0, 0)
-    I(MOVI, 0, 0, -2)
-    I(WRD, 0, 0, 0)
-    I(WRL, 0, 0, 0)
+    II(ADDI, 5, 0, -1)
+    II(ECALL, WRD, 5, 0)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
 
-    // store and load (F2)
-    I(MOVI, 0, 0, 0x12)
-    I(MOV, 0, 8, 0)
-    I(ADDI, 0, 0, 0x34)
-    I(MOV, 0, 8, 0)
-    I(ADDI, 0, 0, 0x56)
-    I(MOV, 0, 8, 0)
-    I(ADDI, 0, 0, 0x78)
-    I(WRH, 0, 0, 0)
-    I(MOVI, 1, 0, 0)
-    I(STW, 0, 1, 0)
-    I(LDW, 2, 1, 0)
-    I(WRH, 0, 0, 2)
-    I(LDB, 2, 1, 0)
-    I(WRH, 0, 0, 2)
-    I(WRL, 0, 0, 0)
+    II(ADDI, 5, 0, -0x7ff - 1)
+    II(ECALL, WRD, 5, 0)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
 
-    // read and write bytes from/to standard input/output
+    // set 32 bits
+    IU(LUI, 5, 0x12345)
+    II(ECALL, WRH, 5, 0)
+    II(ADDI, 5, 5, 0x678)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
+
+    // store and load
+    IU(LUI, 5, 0x12345)
+    II(ADDI, 5, 5, 0x678)
+    IS(SW, 5, 0, 100)
+    II(ADDI, 5, 0, 0)
+    II(ECALL, WRH, 5, 0)
+    II(LW, 5, 0, 100)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
+
+    IU(LUI, 5, 0x12345)
+    II(ADDI, 5, 5, 0x678)
+    IS(SH, 5, 0, 100)
+    II(ADDI, 5, 0, 0)
+    II(ECALL, WRH, 5, 0)
+    II(LH, 5, 0, 100)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
+
+    IU(LUI, 5, 0x12345)
+    II(ADDI, 5, 5, 0x678)
+    IS(SB, 5, 0, 100)
+    II(ADDI, 5, 0, 0)
+    II(ECALL, WRH, 5, 0)
+    II(LB, 5, 0, 100)
+    II(ECALL, WRH, 5, 0)
+    II(ECALL, WRL, 0, 0)
+
+    II(JALR, 0, 1, 0) // rd = 0, rs1 = 1 (return), imm = 0
+    R_print_code(code, len)
+    R_load(code, len)
+    R_execute(0)
+
     /*
+    // read and write bytes from/to standard input/output
     I(RB, 0, 0, 0)
     I(ADDI, 0, 0, 1)
     I(WRB, 0, 0, 0)
@@ -383,29 +876,6 @@ void test_risc(void)
     I(WRL, 0, 0, 0)
     */
 
-    I(MOVI, 0, 0, 999)
-    // I(MOVI, 0, 0, -1) // index out of bounds error
-    // I(MOVI, 0, 0, 1000) // index out of bounds error
-    I(CHKI, 0, 0, 1000)
-
-    // case MOV: case MOVI: R[a] = ASH(c, b); break // arithmetic shift
-    // MOV a, b, c       R.a := Shift(R.c, b)
-    // MOVI a, b, im     R.a := Shift(im, b)
-    // #define ASH(x, s) ((x) << (s))
-    I(MOVI, 5, 1, 100)
-    I(MOV, 1, 0, 5)
-    I(WRD, 0, 0, 1)
-    I(WRL, 0, 0, 0)
-    I(MOVI, 1, 0, 5)
-    I(WRD, 0, 0, 1)
-    I(WRL, 0, 0, 0)
-
-    I(RET, 0, 0, 14) // end execution
-
-    R_print_code(code, len)
-    R_load(code, len)
-    R_execute(0)
-
-int xmain(void)
+int main(void)
     test_risc()
     return 0
