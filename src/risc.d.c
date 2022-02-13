@@ -29,6 +29,8 @@ All instructions of the RISC processor are 32 bits long. There are six formats:
 *typedef enum {
     // R-format (register)
     ADD, SUB, XOR, OR, AND, SLL, SRL, SRA, SLT, SLTU, 
+    // R-format (register): M standard extension
+    MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     // I-format (immediate)
     ADDI, XORI, ORI, ANDI, SLLI, SRLI, SRAI, SLTI, SLTIU, 
     LB, LH, LW, LBU, LHU, JALR, ECALL, EBREAK, 
@@ -67,6 +69,15 @@ R_Instruction instructions[] = {
     { SRA, "SRA",       FormatR, 0b0110011, 0x20, 5, 0, 0, 0, 0 },
     { SLT, "SLT",       FormatR, 0b0110011, 0, 2, 0, 0, 0, 0 },
     { SLTU, "SLTU",     FormatR, 0b0110011, 0, 3, 0, 0, 0, 0 },
+    // R-format (register): M standard extension
+    { MUL, "MUL",       FormatR, 0b0110011, 1, 0, 0, 0, 0, 0 },
+    { MULH, "MULH",     FormatR, 0b0110011, 1, 1, 0, 0, 0, 0 },
+    { MULHSU, "MULHSU", FormatR, 0b0110011, 1, 2, 0, 0, 0, 0 },
+    { MULHU, "MULHU",   FormatR, 0b0110011, 1, 3, 0, 0, 0, 0 },
+    { DIV, "DIV",       FormatR, 0b0110011, 1, 4, 0, 0, 0, 0 },
+    { DIVU, "DIVU",     FormatR, 0b0110011, 1, 5, 0, 0, 0, 0 },
+    { REM, "REM",       FormatR, 0b0110011, 1, 6, 0, 0, 0, 0 },
+    { REMU, "REMU",     FormatR, 0b0110011, 1, 7, 0, 0, 0, 0 },
     // I-format (immediate)
     { ADDI, "ADDI",     FormatI, 0b0010011, 0, 0, 0, 0, 0, 0 },
     { XORI, "XORI",     FormatI, 0b0010011, 0, 4, 0, 0, 0, 0 },
@@ -106,7 +117,7 @@ R_Instruction instructions[] = {
 }
 #define R_INSTRUCTION_COUNT (sizeof(instructions) / sizeof(instructions[0]))
 
-*enum ECallFunctions { RD, WRD, WRH, WRL, RB, WRB }
+*enum R_ECallFunctions { RD, WRD, WRH, WRL, RB, WRB }
 char* ecall_functions_names[] = { "RD", "WRD", "WRH", "WRL", "RB", "WRB" }
 
 int funct7(R_Inst inst)
@@ -151,10 +162,7 @@ int format(R_Inst inst)
                     // I-format:     imm11:0   rs1 funct3   rd opcode
                     inst->rd = rd
                     inst->rs1 = rs1
-                    imm = (x >> 20) & 0xfff
-                    if imm & 0x800 do imm |= ~0xfff // sign-extend
-                    //todo: remove if inst2->inst == SRAI do imm &= ~(0x20 << 5)
-                    inst->imm = imm
+                    inst->imm = x >> 20 // shift and sign-extend
                     return
                 case 0b1110011: // I (ECALL, EBREAK)
                     imm = (x >> 20) & 0xfff
@@ -178,7 +186,7 @@ int format(R_Inst inst)
                     inst->rs1 = rs1
                     inst->rs2 = rs2
                     imm = ((x >> 20) & (0x7f << 5)) | ((x >> 7) & 0x1f)
-                    if imm & 0x800 do imm |= ~0xfff // sign-extend
+                    imm = (imm << 20) >> 20 // sign extend
                     inst->imm = imm
                     return
                 case 0b1100011: // B
@@ -188,7 +196,7 @@ int format(R_Inst inst)
                     inst->rs2 = rs2
                     imm = ((x >> (31-12)) & (1 << 12)) | ((x << (11-7)) & (1 << 11))\
                         | ((x >> (25-5)) & (0x3f << 5)) | ((x >> (8-1)) & (0xf << 1))
-                    if imm & 0x1000 do imm |= ~0x1fff // sign-extend
+                    imm = (imm << 19) >> 19 // sign extend
                     inst->imm = imm
                     return
                 case 0b0110111: // U
@@ -196,7 +204,7 @@ int format(R_Inst inst)
                     // Bits:   31:25 24:20 19:15 14:12 11:7    6:0
                     // U-Type:                imm31:12   rd opcode
                     inst->rd = rd
-                    inst->imm = x >> 12
+                    inst->imm = x >> 12 // shift and sign-extend
                     return
                 case 0b1101111: // J
                     // Bits:     31:25   24:20 19:15 14:12 11:7    6:0
@@ -204,7 +212,7 @@ int format(R_Inst inst)
                     inst->rd = rd
                     imm = ((x >> (31-20)) & (1 << 20)) | (x & (0xff << 12))\
                         | ((x >> (20-11)) & (1 << 11)) | ((x >> (21-1)) & (0x3ff << 1))
-                    if imm & 0x100000 do imm |= ~0x1fffff // sign-extend
+                    imm = (imm << 11) >> 11 // sign extend
                     inst->imm = imm
                     return
     exit_if(false, "not implemented: %08x %x %x %x", x, opcode, funct7, funct3)
@@ -430,7 +438,8 @@ before.
     PC = R_PROG_ORG + start // program counter
     while true do // interpretation cycle
         nextPC = PC + R_WORD_SIZE // address of next instruction word
-        exit_if(PC < 0 || PC > R_MEM_SIZE - R_WORD_SIZE || (PC & (R_WORD_SIZE - 1)), "invalid PC (%d)", PC)
+        exit_if(PC < 0 || PC > R_MEM_SIZE - R_WORD_SIZE || (PC & (R_WORD_SIZE - 1)),
+                "invalid PC (%d)", PC)
         IR = M[PC / R_WORD_SIZE]; // memory is organized in 32-bit words
         R_decode_instruction(IR, &i)
         switch i.inst do
@@ -445,6 +454,32 @@ before.
             case SRA: R[i.rd] = R[i.rs1] >> (R[i.rs2] & 0x1f); break
             case SLT: R[i.rd] = R[i.rs1] < R[i.rs2] ? 1 : 0; break
             case SLTU: R[i.rd] = (unsigned)R[i.rs1] < (unsigned)R[i.rs2] ? 1 : 0; break
+            // R-format (register): M standard extension
+            case MUL: R[i.rd] = R[i.rs1] * R[i.rs2]; break
+            case MULH: R[i.rd] = ((int64_t)R[i.rs1] * (int64_t)R[i.rs2]) >> 32; break
+            case MULHU: R[i.rd] = ((uint64_t)R[i.rs1] * (uint64_t)R[i.rs2]) >> 32; break
+            case MULHSU: R[i.rd] = ((int64_t)R[i.rs1] * (uint64_t)R[i.rs2]) >> 32; break
+            // Condition              Dividend  Divisor  DIVU     REMU     DIV    REM
+            // Division by zero          x         0    (2^32)-1   x       −1      x
+            // Overflow (signed only)  −(2^31)    −1       –       –     −(2^31)   0
+            case DIV:
+                if R[i.rs2] == 0 do R[i.rd] = -1
+                else if R[i.rs1] == 1 << 31 && R[i.rs2] == -1 do R[i.rd] = 1 << 31
+                else R[i.rd] = R[i.rs1] / R[i.rs2]
+                break
+            case DIVU:
+                if R[i.rs2] == 0 do R[i.rd] = -1
+                else R[i.rd] = (unsigned)R[i.rs1] / (unsigned)R[i.rs2]
+                break
+            case REM:
+                if R[i.rs2] == 0 do R[i.rd] = R[i.rs1]
+                else if R[i.rs1] == 1 << 31 && R[i.rs2] == -1 do R[i.rd] = 0
+                else R[i.rd] = R[i.rs1] % R[i.rs2]
+                break
+            case REMU:
+                if R[i.rs2] == 0 do R[i.rd] = R[i.rs1]
+                else R[i.rd] = (unsigned)R[i.rs1] % (unsigned)R[i.rs2]
+                break
             // I-format (immediate)
             case ADDI: R[i.rd] = R[i.rs1] + i.imm; break
             case XORI: R[i.rd] = R[i.rs1] ^ i.imm; break
@@ -576,6 +611,22 @@ bool base_test_equal_instruction(const char *file, int line, R_Instruction actua
 #define EB(inst, rs1, rs2, imm) code[len++] = R_encode_B(inst, rs1, rs2, imm)
 #define EU(inst, rd, imm) code[len++] = R_encode_U(inst, rd, imm)
 #define ES(inst, rs2, rs1, imm) code[len++] = R_encode_S(inst, rs2, rs1, imm)
+
+int set_reg(INTEGER* code, int len, int reg, INTEGER imm)
+    if -0x800 <= imm && imm < 0x800 do
+        EI(ADDI, reg, 0, imm)
+    else
+        INTEGER xl = (imm << 20) >> 20 // lower 12 bits, sign-extend
+        // assert: imm == (xu << 12) + xl
+        INTEGER xu = (imm - xl) >> 12
+        EU(LUI, reg, xu)
+        EI(ADDI, reg, reg, xl)
+    return len
+
+INTEGER sign(INTEGER x)
+    if x > 0 do return 1
+    if x < 0 do return -1
+    return 0
 
 // Performs some tests.
 void test_risc(void)
@@ -806,6 +857,18 @@ void test_risc(void)
     INTEGER code[100]
     int len = 0
 
+    for INTEGER i = -0x1000; i <= 0x1000; i++ do
+        len = 0
+        len = set_reg(code, len, 5, i)
+        if len == 1 do
+            R_decode_instruction(code[0], &x)
+            assert("", x.inst == ADDI && x.imm == i)
+        else
+            R_decode_instruction(code[0], &x)
+            R_decode_instruction(code[1], &y)
+            assert("", x.inst == LUI && y.inst == ADDI && (x.imm << 12) + y.imm == i)
+    len = 0
+
     // 123 + 456
     EI(ADDI, 5, 0, 123)
     EI(ADDI, 6, 0, 456)
@@ -944,10 +1007,106 @@ void test_risc(void)
     EI(ECALL, WRL, 0, 0)
     */
 
+    EI(ADDI, 5, 0, 25)
+    EI(ADDI, 6, 0, 3)
+    ER(MUL, 7, 5, 6)
+    ER(DIV, 8, 5, 6)
+    ER(REM, 9, 5, 6)
+    EI(ECALL, WRD, 7, 0)
+    EI(ECALL, WRD, 8, 0)
+    EI(ECALL, WRD, 9, 0)
+    EI(ECALL, WRL, 0, 0)
+
+    len = set_reg(code, len, 5, 0xffffffff)
+    len = set_reg(code, len, 6, 0xffffffff)
+    ER(MUL, 7, 5, 6)
+    ER(DIV, 8, 5, 6)
+    ER(REM, 9, 5, 6)
+    EI(ECALL, WRH, 5, 0)
+    EI(ECALL, WRH, 6, 0)
+    EI(ECALL, WRH, 7, 0)
+    EI(ECALL, WRD, 8, 0)
+    EI(ECALL, WRD, 9, 0)
+    EI(ECALL, WRL, 0, 0)
+
     EI(JALR, 0, 1, 0) // rd = 0, rs1 = 1 (return), imm = 0
     R_print_code(code, len)
     R_load(code, len)
     R_execute(0)
+
+    int64_t k = 0xf
+    int64_t l = 0xf
+    int64_t m = k * l
+    printf("k = %llx, l = %llx, m = %llx\n", k, l, m)
+
+    k = 0xff
+    l = 0xff
+    m = k * l
+    printf("k = %llx, l = %llx, m = %llx\n", k, l, m)
+
+    k = 0xfff
+    l = 0xfff
+    m = k * l
+    printf("k = %llx, l = %llx, m = %llx\n", k, l, m)
+
+    k = 0xffffffff
+    l = 0xffffffff
+    m = k * l
+    printf("k = %llx, l = %llx, m = %llx\n", k, l, m)
+    printf("k = %lld, l = %lld, m = %lld\n", k, l, m)
+
+    k = -1
+    l = -1
+    m = k * l
+    printf("k = %llx, l = %llx, m = %llx\n", k, l, m)
+    printf("k = %lld, l = %lld, m = %lld\n", k, l, m)
+
+    uint64_t n = 0xf
+    uint64_t o = 0xf
+    uint64_t p = n * o
+    printf("n = %llx, o = %llx, p = %llx\n", n, o, p)
+
+    n = 0xff
+    o = 0xff
+    p = n * o
+    printf("n = %llx, o = %llx, p = %llx\n", n, o, p)
+
+    n = 0xfff
+    o = 0xfff
+    p = n * o
+    printf("n = %llx, o = %llx, p = %llx\n", n, o, p)
+
+    n = 0xffffffff
+    o = 0xffffffff
+    p = n * o
+    printf("n = %llx, o = %llx, p = %llx\n", n, o, p)
+    printf("n = %llu, o = %llu, p = %llu\n", n, o, p)
+
+    n = -1
+    o = -1 // 0
+    p = n * o
+    printf("n = %llx, o = %llx, p = %llx\n", n, o, p)
+    printf("n = %llu, o = %llu, p = %llu\n", n, o, p)
+
+    k = 5
+    l = 2 // 0
+    m = k / l
+    printf("k = %lld, l = %lld, m = %lld\n", k, l, m)
+
+    int ki = -(1 << 31)
+    int li = 1 // -1
+    int mi = ki / li
+    printf("ki = %d, li = %d, mi = %d\n", ki, li, mi)
+
+    for ki = -6; ki <= 6; ki++ do
+        li = -3 // -3
+        mi = ki % li
+        int q = ki / li
+        printf("%d = %d * %d + %d\n", ki, li, q, mi)
+        assert("divident = divisor * quotient + remainder", ki == li * q + mi)
+        assert("sign of remainder equals sign of dividend",
+               sign(mi) == 0 || sign(mi) == sign(ki))
+        assert("valid range", abs(mi) < abs(li))
 
 int main(void)
     test_risc()
