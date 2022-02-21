@@ -41,8 +41,8 @@ booleval: booleval.o scanner.o util.o
 	../../headify/headify $<
 
 # pattern rule for compiling .c-file to executable
-#%: %.o util.o
-#	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
+%: %.o util.o
+	gcc $(CFLAGS) $(DEBUG) $^ -lm -o $@
 
 # create object file from C file
 %.o: %.c
@@ -53,7 +53,7 @@ booleval: booleval.o scanner.o util.o
 	@echo "$@ \\" >$@; \
 	gcc -MM $(CFLAGS) $(DEBUG) $< >>$@
 
-include parser.d generator.d scanner.d risc.d util.d
+-include parser.d generator.d scanner.d risc.d util.d
 
 # do not treat "clean" as a file name
 .PHONY: clean 
