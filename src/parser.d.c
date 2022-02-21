@@ -246,7 +246,7 @@ Checks if obj is a procedure parameter. Local variables have address offset
 value < 0 (relative to FP). Global variables also have address offset < 0
 (relative to PC). Value parameters have value > 0.
 */
-BOOLEAN is_param(G_Object* obj)
+bool is_param(G_Object* obj)
     return obj->class == Par || (obj->class == Var && obj->value > 0)
 end. is_param
 
