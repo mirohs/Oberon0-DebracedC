@@ -4,7 +4,7 @@
 
 Volume 1, Unprivileged Spec v. 20191213
 https://riscv.org/technical/specifications/
-Ch. 24. Instruction Set Listings (p. 130)
+Chapter 24. Instruction Set Listings (p. 130)
 */
 
 #include "util.h"
@@ -28,7 +28,7 @@ All instructions of the RISC processor are 32 bits long. There are six formats:
 */
 *typedef enum {
     // R-format (register)
-    ADD, SUB, XOR, OR, AND, SLL, SRL, SRA, SLT, SLTU, 
+    SUB, ADD, XOR, OR, AND, SLL, SRL, SRA, SLT, SLTU, 
     // R-format (register): M standard extension
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     // I-format (immediate)
@@ -59,8 +59,8 @@ All instructions of the RISC processor are 32 bits long. There are six formats:
 
 R_Instruction instructions[] = {
     // R-format (register)
-    { ADD, "ADD",       FormatR, 0b0110011, 0, 0, 0, 0, 0, 0 },
     { SUB, "SUB",       FormatR, 0b0110011, 0x20, 0, 0, 0, 0, 0 },
+    { ADD, "ADD",       FormatR, 0b0110011, 0, 0, 0, 0, 0, 0 },
     { XOR, "XOR",       FormatR, 0b0110011, 0, 4, 0, 0, 0, 0 },
     { OR,  "OR",        FormatR, 0b0110011, 0, 6, 0, 0, 0, 0 },
     { AND, "AND",       FormatR, 0b0110011, 0, 7, 0, 0, 0, 0 },
@@ -117,8 +117,8 @@ R_Instruction instructions[] = {
 }
 #define R_INSTRUCTION_COUNT (sizeof(instructions) / sizeof(instructions[0]))
 
-*enum R_ECallFunctions { RD, WRD, WRH, WRL, RB, WRB }
-char* ecall_functions_names[] = { "RD", "WRD", "WRH", "WRL", "RB", "WRB" }
+*enum R_ECallFunctions { RD, WRD, WRH, WRL, RB, WRB, EXIDX }
+char* ecall_functions_names[] = { "RD", "WRD", "WRH", "WRL", "RB", "WRB", "EXIDX" }
 
 int funct7(R_Inst inst)
     return instructions[inst].funct7
@@ -274,7 +274,7 @@ R_encode_R(ADD, rd, rs1, rs2)
 Bits:      31:25 24:20 19:15  14:12 11:7    6:0
 R-format: funct7   rs2   rs1 funct3   rd opcode
 */
-*INTEGER R_encode_R(int inst, int rd, int rs1, int rs2)
+*INTEGER R_encode_R(int inst, INTEGER rd, INTEGER rs1, INTEGER rs2)
     require("valid format", format(inst) == FormatR)
     require("valid range", 0 <= rd && rd <= 31)
     require("valid range", 0 <= rs1 && rs1 <= 31)
@@ -289,7 +289,7 @@ R_encode_I(ADDI, rd, rs1, imm)
 Bits:     31:25 24:20 19:15i 14:12 11:7    6:0
 I-format:     imm11:0   rs1 funct3   rd opcode
 */
-*INTEGER R_encode_I(int inst, int rd, int rs1, int imm)
+*INTEGER R_encode_I(int inst, INTEGER rd, INTEGER rs1, INTEGER imm)
     require("valid format", format(inst) == FormatI)
     require("valid range", 0 <= rd && rd <= 31)
     require("valid range", 0 <= rs1 && rs1 <= 31)
@@ -305,7 +305,7 @@ R_encode_S(SB, rs2, rs1, imm)       M[rs1+imm][0:7] = rs2[0:7]
 Bits:       31:25 24:20 19:15  14:12   11:7    6:0
 S-format: imm11:5   rs2   rs1 funct3 imm4:0 opcode
 */
-*INTEGER R_encode_S(int inst, int rs2, int rs1, int imm)
+*INTEGER R_encode_S(int inst, INTEGER rs2, INTEGER rs1, INTEGER imm)
     require("valid format", format(inst) == FormatS)
     require("valid range", 0 <= rs1 && rs1 <= 31)
     require("valid range", 0 <= rs2 && rs2 <= 31)
@@ -320,7 +320,7 @@ R_encode_B(BEQ, rs1, rs2, imm)      if(rs1 == rs2) PC += imm
 Bits:          31:25 24:20 19:15  14:12      11:7    6:0
 B-format: imm12,10:5   rs2   rs1 funct3 imm4:1,11 opcode
 */
-*INTEGER R_encode_B(int inst, int rs1, int rs2, int imm)
+*INTEGER R_encode_B(int inst, INTEGER rs1, INTEGER rs2, INTEGER imm)
     require("valid format", format(inst) == FormatB)
     require("valid range", 0 <= rs1 && rs1 <= 31)
     require("valid range", 0 <= rs2 && rs2 <= 31)
@@ -337,7 +337,7 @@ R_encode_U(LUI, rd, imm)
 Bits:   31:25 24:20 19:15 14:12 11:7    6:0
 U-format:              imm31:12   rd opcode
 */
-*INTEGER R_encode_U(int inst, int rd, int imm)
+*INTEGER R_encode_U(int inst, INTEGER rd, INTEGER imm)
     require("valid format", format(inst) == FormatU)
     require("valid range", 0 <= rd && rd <= 31)
     require("valid range", -0x80000 <= imm && imm <= 0x7ffff)
@@ -350,7 +350,7 @@ R_encode_J(JAL, rd, imm)            rd = PC+4; PC += imm
 Bits:       31:25 24:20 19:15 14:12 11:7    6:0
 J-format: imm20,10:1,11,      19:12   rd opcode
 */
-*INTEGER R_encode_J(int inst, int rd, int imm)
+*INTEGER R_encode_J(int inst, INTEGER rd, INTEGER imm)
     require("valid format", format(inst) == FormatJ)
     require("valid range", 0 <= rd && rd <= 31)
     require("valid range", -0x100000 <= imm && imm <= 0xfffff)
@@ -362,14 +362,28 @@ J-format: imm20,10:1,11,      19:12   rd opcode
 INTEGER IR // instruction register
 /*
 Integer registers:
-  x0: zero
-  x1: ra, return address (link register)
-  x2: sp, stack pointer
-  x3: gp, global pointer
-  x4: tp, thread pointer
-  x8: s0/fp, frame pointer
+
+Volume 1, Unprivileged Spec v. 20191213
+https://riscv.org/technical/specifications/
+Chapter 25. RISC-V Assembly Programmer's Handbook (p. 137)
+
+Register ABI Name Description                       Saver
+x0       zero     Hard-wired zero                   —
+x1       ra       Return address                    Caller
+x2       sp       Stack pointer                     Callee
+x3       gp       Global pointer                    —
+x4       tp       Thread pointer                    —
+x5       t0       Temporary/alternate link register Caller
+x6–7     t1–2     Temporaries                       Caller
+x8       s0/fp    Saved register/frame pointer      Callee
+x9       s1       Saved register                    Callee
+x10–11   a0–1     Function arguments/return values  Caller
+x12–17   a2–7     Function arguments                Caller
+x18–27   s2–11    Saved registers                   Callee
+x28–31   t3–6     Temporaries                       Caller
 */
-INTEGER R[32] // integer registers
+*#define R_REGISTER_COUNT 32
+INTEGER R[R_REGISTER_COUNT] // integer registers
 INTEGER PC // program counter
 INTEGER M[R_MEM_SIZE / R_WORD_SIZE] // program and data memory, organized as 32-bit words
 
@@ -494,7 +508,7 @@ before.
             case LB: R[i.rd] = get_B(R[i.rs1] + i.imm); break
             case LH: R[i.rd] = get_H(R[i.rs1] + i.imm); break
             case LW: R[i.rd] = get_M(R[i.rs1] + i.imm); break
-            // I-format (jump and call)
+            // I-format (jump and ecall)
             case JALR: R[i.rd] = PC + R_WORD_SIZE; nextPC = (R[i.rs1] + i.imm) & ~1; break
             case ECALL: // R_encode_I(ECALL, WRD, rs1, 0)
                 switch i.rd do
@@ -504,9 +518,12 @@ before.
                     case WRL: printf("\n"); break
                     case RB: R[i.rs1] = getchar(); break
                     case WRB: putchar(R[i.rs1]); break
-                    default: exit_if(true, "invalid ECALL function (rd = %d, rs1 = %d)", i.rd, i.rs1)
+                    case EXIDX: exit_if(true, "%d:%d: index out of bounds (PC = %d)\n",
+                                        R[i.rs1] / 1000, R[i.rs1] % 1000, PC); break
+                    default: exit_if(true, "invalid ECALL function (rd = %d, rs1 = %d)",
+                                     i.rd, i.rs1); break
                 break
-            // S-format (store): R_encode_S(SB, rs2, rs1, imm)  -->  M[rs1+imm][0:7] = rs2[0:7]
+            // S-format (store): R_encode_S(SB, rs2, rs1, imm)  -->  M[R[i.rs1]+imm] = R[i.rs2]
             case SB: set_B(R[i.rs1] + i.imm, R[i.rs2]); break
             case SH: set_H(R[i.rs1] + i.imm, R[i.rs2]); break
             case SW: set_M(R[i.rs1] + i.imm, R[i.rs2]); break
@@ -612,16 +629,17 @@ bool base_test_equal_instruction(const char *file, int line, R_Instruction actua
 #define EU(inst, rd, imm) code[len++] = R_encode_U(inst, rd, imm)
 #define ES(inst, rs2, rs1, imm) code[len++] = R_encode_S(inst, rs2, rs1, imm)
 
-int set_reg(INTEGER* code, int len, int reg, INTEGER imm)
+int put_ADDI(INTEGER* code, int i, INTEGER rd, INTEGER rs1, INTEGER imm)
     if -0x800 <= imm && imm < 0x800 do
-        EI(ADDI, reg, 0, imm)
+        code[i++] = R_encode_I(ADDI, rd, rs1, imm)
     else
         INTEGER xl = (imm << 20) >> 20 // lower 12 bits, sign-extend
         // assert: imm == (xu << 12) + xl
         INTEGER xu = (imm - xl) >> 12
-        EU(LUI, reg, xu)
-        EI(ADDI, reg, reg, xl)
-    return len
+        code[i++] = R_encode_U(LUI, rd, xu)
+        code[i++] = R_encode_I(ADDI, rd, rd, xl)
+        if rs1 != 0 do code[i++] = R_encode_R(ADD, rd, rd, rs1)
+    return i
 
 INTEGER sign(INTEGER x)
     if x > 0 do return 1
@@ -859,7 +877,7 @@ void test_risc(void)
 
     for INTEGER i = -0x1000; i <= 0x1000; i++ do
         len = 0
-        len = set_reg(code, len, 5, i)
+        len = put_ADDI(code, len, 5, 0, i)
         if len == 1 do
             R_decode_instruction(code[0], &x)
             assert("", x.inst == ADDI && x.imm == i)
@@ -1017,8 +1035,8 @@ void test_risc(void)
     EI(ECALL, WRD, 9, 0)
     EI(ECALL, WRL, 0, 0)
 
-    len = set_reg(code, len, 5, 0xffffffff)
-    len = set_reg(code, len, 6, 0xffffffff)
+    len = put_ADDI(code, len, 5, 0, 0xffffffff)
+    len = put_ADDI(code, len, 6, 0, 0xffffffff)
     ER(MUL, 7, 5, 6)
     ER(DIV, 8, 5, 6)
     ER(REM, 9, 5, 6)
@@ -1108,6 +1126,6 @@ void test_risc(void)
                sign(mi) == 0 || sign(mi) == sign(ki))
         assert("valid range", abs(mi) < abs(li))
 
-int main(void)
+int xmain(void)
     test_risc()
     return 0
