@@ -8,6 +8,7 @@ MODULE M;
 BEGIN
     x := 123;
     Double(x);
+    Write(x); WriteLn
 END M.
 
 

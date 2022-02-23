@@ -9,6 +9,8 @@ BEGIN
     INC(s.x); INC(s.y);
     Write(s.x); WriteLn;
     Write(s.y); WriteLn;
+    Write(r.x); WriteLn;
+    Write(r.y); WriteLn;
     a.r.x := 1;
     a.r.y := 2;
     Write(a.r.x); WriteLn;

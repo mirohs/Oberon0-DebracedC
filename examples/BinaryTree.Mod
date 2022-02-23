@@ -13,8 +13,8 @@ MODULE BinaryTree;
         z: int; (* state of the random number generator *)
 
     (* Generates a "random" integer between low (inclusive) and high (exclusive). *)
-    PROCEDURE Random(VAR result: int; low, high: int);
-        CONST a = 16807; m = 83647; q = m DIV a; r = m MOD a;
+    PROCEDURE Random(VAR result: INTEGER; low, high: INTEGER);
+        CONST a = 16807; m = 2147483647 - 1; q = m DIV a; r = m MOD a;
         VAR gamma: INTEGER;
     BEGIN
         ASSERT(low < high);

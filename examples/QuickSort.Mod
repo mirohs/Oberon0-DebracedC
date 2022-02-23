@@ -17,14 +17,14 @@ MODULE QuickSort;
     BEGIN h := x; x := y; y := h END Swap;
 
     PROCEDURE Random(VAR result: INTEGER; low, high: INTEGER);
-        CONST a = 16807; m = 83647; q = m DIV a; r = m MOD a;
+        CONST a = 16807; m = 2147483647 - 1; q = m DIV a; r = m MOD a;
         VAR gamma: INTEGER;
     BEGIN
         gamma := a * (z MOD q) - r * (z DIV q);
         IF gamma > 0 THEN z := gamma
         ELSE z := gamma + m
         END;
-        result := low + z MOD (high - low)
+        result := low + z MOD (high - low);
     END Random;
 
     PROCEDURE Sort(VAR a: Numbers; low, high: INTEGER);
@@ -50,7 +50,7 @@ MODULE QuickSort;
     END Sort;
 
 BEGIN
-    z := 114359; (* random seed *)
+    z := 1234; (* random seed *)
     i := 0; WHILE i < N DO Random(a[i], 0, 100); INC(i) END;
     WriteNumbers;
     Sort(a, 0, N - 1);
