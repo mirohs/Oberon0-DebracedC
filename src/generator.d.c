@@ -25,6 +25,7 @@ https://people.inf.ethz.ch/wirth/CompilerConstruction/
 char* class_mode_names[] = {
     "Head",
     "Var", "Par", "Const", "Fld", "Typ", "Proc", "StdProc",
+    "unused", "unused", 
     "Reg", "Cond"
 }
 #define CLASS_MODE_COUNT (sizeof(class_mode_names) / sizeof(class_mode_names[0]))
@@ -475,7 +476,7 @@ expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpre
         // jump to next term if factor is false, otherwise check next factor of this term
         // x->a is code index of previous incomplete branch instruction (false-link)
         assert("", 0 <= x->r && x->r <= 31)
-        put_B_cc(negated(x->c), x->r, x->r2, x->a)
+        put_B_cc(negated(x->c), x->r, x->r2, 2 * x->a)
         free_register(&x->r); free_register(&x->r2)
         x->a = G_pc - 1 // code index of just emitted branch instruction, for later fixup
         G_fix_link(x->b) // G_pc is now the index of the next factor of the conditional 
@@ -487,7 +488,7 @@ expression = SimpleExpression [("=" | "#" | "<" | "<=" | ">" | ">=") SimpleExpre
         // with "or" need to branch if condition is true (short-circuit or operator)
         // x->b is code index of previous incomplete branch instruction (true-link)
         assert("", 0 <= x->r && x->r <= 31)
-        put_B_cc(x->c, x->r, x->r2, x->b)
+        put_B_cc(x->c, x->r, x->r2, 2 * x->b)
         free_register(&x->r); free_register(&x->r2)
         x->b = G_pc - 1 // code index of just emitted branch instruction, for later fixup
         G_fix_link(x->a) // G_pc is now the index of the next term of the conditional 
@@ -633,7 +634,7 @@ end. store_record
             if y->mode == Cond do // transform condition into a storable value
                 // generate a boolean value (1 for true, 0 for false)
                 assert("", 0 <= y->r && y->r <= 31)
-                put_B_cc(negated(y->c), y->r, y->r2, y->a)
+                put_B_cc(negated(y->c), y->r, y->r2, 2 * y->a)
                 //free_register(&x->r); free_register(&x->r2)
                 free_register(&y->r); free_register(&y->r2)
                 y->a = G_pc-1 // set location of last foward jump
@@ -698,7 +699,7 @@ once it is known.
         assert("", 0 <= x->r && x->r <= 31)
         // branch instruction contains address of previous G_cond_forward_jump for later fixup
         // multiplied by two, because branch instruction can only store even values
-        put_B_cc(negated(x->c), x->r, x->r2, x->a * 2) 
+        put_B_cc(negated(x->c), x->r, x->r2, 2 * x->a) 
         free_register(&x->r); free_register(&x->r2)
         G_fix_link(x->b)
         // todo: set x->b = 0 ?
@@ -799,9 +800,9 @@ void put_number(int i)
         assert("", 0 <= y->r && y->r <= 31)
         put_B_cc(y->c, y->r, y->r2, 0)
         free_register(&y->r); free_register(&y->r2)
-        G_fix_link(y->b)
-        y->b = 0
 
+        // emit code for failed assertion
+        G_fix_link(y->a); y->a = 0 // fix false links
         // output line number of assertion
         int line = 0, column = 0
         S_line_and_column(&line, &column)
@@ -809,12 +810,13 @@ void put_number(int i)
         put_string("ASSERT failed, line:")
         put_number(line)
         put_I(ECALL, WRL, 0, 0)
-
         // terminate program
         put_I(ADDI, LNK, 0, 0)
         put_I(JALR, 0, LNK, 0)
 
+        // continue here if assertion passed
         G_fix_link(branch_location)
+        G_fix_link(y->b); y->b = 0 // fix true links
     else 
         S_mark("Boolean?")
 end. G_assert
